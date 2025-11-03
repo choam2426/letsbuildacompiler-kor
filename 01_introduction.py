@@ -47,3 +47,9 @@ class Compiler:
         num = self.look
         self.get_char()
         return num
+
+    def emit(self, s: str):
+        self.output.write("    " +s)
+    
+    def emit_ln(self, s: str):
+        self.emit(s + "\n")
