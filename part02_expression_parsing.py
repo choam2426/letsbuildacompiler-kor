@@ -71,7 +71,7 @@ class Compiler:
     def divide(self):
         self.match("/")
         self.factor()
-        self.emit_ln("i32.div")
+        self.emit_ln("i32.div_s")
 
     def term(self):
         self.factor()

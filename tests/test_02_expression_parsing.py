@@ -1,6 +1,28 @@
 import io
 import unittest
+from tests.wasm_util import run_wasm
 from part02_expression_parsing import Compiler
+
+
+class TestCompileAndExecute(unittest.TestCase):
+    def compile_and_run(self, src: str) -> int:
+        output = io.StringIO()
+        compiler = Compiler(src, output=output)
+        compiler.expression()
+        instrs = output.getvalue()
+        return run_wasm("test_expression", instrs)
+
+    def test_simple_addition(self):
+        result = self.compile_and_run("3+5")
+        self.assertEqual(result, 8)
+
+    def test_mixed_operations(self):
+        result = self.compile_and_run("(3+5)*2-8/4")
+        self.assertEqual(result, 14)
+
+    # def test_multiple_operations(self):
+    #     result = self.compile_and_run("10-2+4*3")
+    #     self.assertEqual(result, 20)
 
 
 class TestCompilerEmittedSource(unittest.TestCase):
@@ -39,7 +61,7 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "i32.mul",
                 "i32.const 8",
                 "i32.const 4",
-                "i32.div",
+                "i32.div_s",
                 "i32.sub",
             ],
         )
