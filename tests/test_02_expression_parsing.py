@@ -20,9 +20,9 @@ class TestCompileAndExecute(unittest.TestCase):
         result = self.compile_and_run("(3+5)*2-8/4")
         self.assertEqual(result, 14)
 
-    # def test_multiple_operations(self):
-    #     result = self.compile_and_run("10-2+4*3")
-    #     self.assertEqual(result, 20)
+    def test_multiple_operations(self):
+        result = self.compile_and_run("1-2+4*3")
+        self.assertEqual(result, 11)
 
 
 class TestCompilerEmittedSource(unittest.TestCase):
