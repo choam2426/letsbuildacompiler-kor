@@ -10,9 +10,8 @@ class TestCompiler(unittest.TestCase):
 
     def test_get_name_invalid(self):
         compiler = Compiler("1")
-        with self.assertRaises(Exception) as e:
+        with self.assertRaisesRegex(Exception, "Name expected"):
             compiler.get_name()
-        self.assertEqual(str(e.exception), "Error: Name expected")
 
     def test_get_num_valid(self):
         compiler = Compiler("5")
@@ -21,9 +20,8 @@ class TestCompiler(unittest.TestCase):
 
     def test_get_num_invalid(self):
         compiler = Compiler("A")
-        with self.assertRaises(Exception) as e:
+        with self.assertRaisesRegex(Exception, "Integer"):
             compiler.get_num()
-        self.assertEqual(str(e.exception), "Error: Integer expected")
 
     def test_match(self):
         compiler = Compiler("A")
@@ -32,9 +30,8 @@ class TestCompiler(unittest.TestCase):
 
         # invalid matches
         compiler = Compiler("B")
-        with self.assertRaises(Exception) as e:
+        with self.assertRaisesRegex(Exception, "'A' expected"):
             compiler.match("A")
-        self.assertEqual(str(e.exception), "Error: 'A' expected")
 
     def test_emit(self):
         import io

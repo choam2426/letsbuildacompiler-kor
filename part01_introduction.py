@@ -29,22 +29,15 @@ class Compiler:
         else:
             self.expected(f"'{x}'")
 
-    def is_alpha(self, c: str) -> bool:
-        return c.isalpha() if c else False
-
-    def is_digit(self, c: str) -> bool:
-        return c.isdigit() if c else False
-
     def get_name(self) -> str:
-        if not self.is_alpha(self.look):
+        if not self.look.isalpha():
             self.expected("Name")
-        # Use Python's upper() to convert to uppercase
         name = self.look.upper()
         self.get_char()
         return name
 
     def get_num(self) -> str:
-        if not self.is_digit(self.look):
+        if not self.look.isdigit():
             self.expected("Integer")
         num = self.look
         self.get_char()
