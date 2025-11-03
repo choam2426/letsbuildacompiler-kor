@@ -8,6 +8,7 @@ class Compiler:
         self.pos = 0
         self.look = ""
         self.output = output
+        self.get_char()
 
     def get_char(self):
         if self.pos < len(self.src):
@@ -37,7 +38,8 @@ class Compiler:
     def get_name(self) -> str:
         if not self.is_alpha(self.look):
             self.expected("Name")
-        name = self.look.toupper()
+        # Use Python's upper() to convert to uppercase
+        name = self.look.upper()
         self.get_char()
         return name
 
@@ -49,7 +51,7 @@ class Compiler:
         return num
 
     def emit(self, s: str):
-        self.output.write("    " +s)
-    
+        self.output.write("    " + s)
+
     def emit_ln(self, s: str):
         self.emit(s + "\n")
