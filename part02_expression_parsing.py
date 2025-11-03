@@ -50,3 +50,16 @@ class Compiler:
 
     def emit_ln(self, s: str):
         self.emit(s + "\n")
+
+    def factor(self):
+        self.emit_ln(f"i32.const {s}")
+    
+    def multiply(self):
+        self.match('*')
+        self.factor()
+        self.emit_ln("i32.mul")
+    
+    def divide(self):
+        self.match('/')
+        self.factor()
+        self.emit_ln("i32.div")
