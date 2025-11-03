@@ -45,6 +45,9 @@ class Compiler:
         self.get_char()
         return num
 
+    def is_addop(self, c: str) -> bool:
+        return c in ("+", "-")
+
     def emit(self, s: str):
         self.output.write("    " + s)
 
@@ -52,14 +55,51 @@ class Compiler:
         self.emit(s + "\n")
 
     def factor(self):
-        self.emit_ln(f"i32.const {s}")
-    
+        if self.look == "(":
+            self.match("(")
+            self.expression()
+            self.match(")")
+        else:
+            s = self.get_num()
+            self.emit_ln(f"i32.const {s}")
+
     def multiply(self):
-        self.match('*')
+        self.match("*")
         self.factor()
         self.emit_ln("i32.mul")
-    
+
     def divide(self):
-        self.match('/')
+        self.match("/")
         self.factor()
         self.emit_ln("i32.div")
+
+    def term(self):
+        self.factor()
+        while self.look in ("*", "/"):
+            if self.look == "*":
+                self.multiply()
+            elif self.look == "/":
+                self.divide()
+
+    def add(self):
+        self.match("+")
+        self.term()
+        self.emit_ln("i32.add")
+
+    def subtract(self):
+        self.match("-")
+        self.term()
+        self.emit_ln("i32.sub")
+
+    def expression(self):
+        # For handling unary + and - operators, emit a zero first and then
+        # proceed as usual.
+        if self.is_addop(self.look):
+            self.emit_ln("i32.const 0")
+        else:
+            self.term()
+        while self.look in ("+", "-"):
+            if self.look == "+":
+                self.add()
+            elif self.look == "-":
+                self.subtract()
