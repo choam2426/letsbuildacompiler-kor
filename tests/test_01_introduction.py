@@ -1,3 +1,4 @@
+import io
 import unittest
 from part01_introduction import Compiler
 
@@ -34,16 +35,12 @@ class TestCompiler(unittest.TestCase):
             compiler.match("A")
 
     def test_emit(self):
-        import io
-
         output = io.StringIO()
         compiler = Compiler("", output=output)
         compiler.emit("MOV A, B")
         self.assertEqual(output.getvalue(), "    MOV A, B")
 
     def test_emit_ln(self):
-        import io
-
         output = io.StringIO()
         compiler = Compiler("", output=output)
         compiler.emit_ln("MOV A, B")
