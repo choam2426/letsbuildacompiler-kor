@@ -25,6 +25,33 @@ class TestCompiler(unittest.TestCase):
             compiler.get_num()
         self.assertEqual(str(e.exception), "Error: Integer expected")
 
+    def test_match(self):
+        compiler = Compiler("A")
+        compiler.match("A")
+        self.assertEqual(compiler.look, "")
+
+        # invalid matches
+        compiler = Compiler("B")
+        with self.assertRaises(Exception) as e:
+            compiler.match("A")
+        self.assertEqual(str(e.exception), "Error: 'A' expected")
+
+    def test_emit(self):
+        import io
+
+        output = io.StringIO()
+        compiler = Compiler("", output=output)
+        compiler.emit("MOV A, B")
+        self.assertEqual(output.getvalue(), "    MOV A, B")
+
+    def test_emit_ln(self):
+        import io
+
+        output = io.StringIO()
+        compiler = Compiler("", output=output)
+        compiler.emit_ln("MOV A, B")
+        self.assertEqual(output.getvalue(), "    MOV A, B\n")
+
 
 if __name__ == "__main__":
     unittest.main()
