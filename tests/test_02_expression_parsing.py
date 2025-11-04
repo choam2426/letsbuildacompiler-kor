@@ -12,6 +12,10 @@ class TestCompileAndExecute(unittest.TestCase):
         instrs = output.getvalue()
         return run_wasm(instrs)
 
+    def test_single_number(self):
+        result = self.compile_and_run("4")
+        self.assertEqual(result, 4)
+
     def test_simple_addition(self):
         result = self.compile_and_run("3+5")
         self.assertEqual(result, 8)
@@ -23,6 +27,10 @@ class TestCompileAndExecute(unittest.TestCase):
     def test_multiple_operations(self):
         result = self.compile_and_run("1-2+4*3")
         self.assertEqual(result, 11)
+
+    def test_nested_parentheses(self):
+        result = self.compile_and_run("((2+3)*(4-1))/5")
+        self.assertEqual(result, 3)
 
 
 class TestCompilerEmittedSource(unittest.TestCase):
