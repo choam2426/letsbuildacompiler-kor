@@ -2,6 +2,9 @@ from typing import TextIO
 import sys
 
 
+# The interpreter doesn't emit code, it executes it directly. Here, output
+# refers to the stdout used for the ! (output) command. inp refers to stdin
+# used for the ? (input) command.
 class Interpreter:
     def __init__(
         self, src: str, input: TextIO = sys.stdin, output: TextIO = sys.stdout
@@ -12,8 +15,7 @@ class Interpreter:
         self.input = input
         self.output = output
 
-        # Table for holding variable values. Variables that haven't been
-        # assigned to yet default to 0.
+        # Table for holding variable values. Unassigned variables default to 0.
         self.table = {}
 
         self.get_char()
@@ -87,7 +89,6 @@ class Interpreter:
         while self.look in ("*", "/"):
             if self.look == "*":
                 self.match("*")
-                # TODO: bugfix from original tutorial, was num
                 result *= self.factor()
             elif self.look == "/":
                 self.match("/")
@@ -95,6 +96,7 @@ class Interpreter:
         return result
 
     def expression(self) -> int:
+        # Handling unary operators
         result = 0
         if not self.is_addop(self.look):
             result = self.term()

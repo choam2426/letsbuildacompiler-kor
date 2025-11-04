@@ -77,3 +77,24 @@ don't actually execute anything but just do some sanity checking on the
 text of the emitted WASM. We expect that future parts - building on top of
 the base implemented here - will be more amenable to automatic execution
 testing.
+
+## Part 4: Interpreters
+
+This part is a slight detour into interpretation, showing how (little) the
+structure of the parser changes if it has to evaluate expressions on the fly
+rather than emitting code for them. To align with this goal, the main class
+in this part is called `Interpreter` rather than `Compiler`.
+
+To support the input (?) and output (!) operations, `Interpreter` takes
+an input and output stream as parameters (these are the executed program's
+"stdin" and "stdout"). As opposed to the `Compiler`, we don't emit code to
+the output stream; rather, the only output sent there is from the ! operation.
+
+Otherwise, the structure of our interpreter follows the original tutorial very
+closely, as usual. There are some slight improvements, like a more general
+variable table (working for arbitrary variable names, not just single
+characters). There are also some bug fixes; the original tutorial neglects to
+properly implement nesting of recursive-descent calls. For example, in `Term` it
+starts by obtaining the value with `GetNum` rather than with `Factor`. This
+means nested expressions (with parentheses) won't be supported. Our
+`Interpreter` fixes this and similar issues.
