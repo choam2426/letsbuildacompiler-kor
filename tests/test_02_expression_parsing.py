@@ -10,7 +10,7 @@ class TestCompileAndExecute(unittest.TestCase):
         compiler = Compiler(src, output=output)
         compiler.expression()
         instrs = output.getvalue()
-        return run_wasm("test_expression", instrs)
+        return run_wasm(instrs)
 
     def test_simple_addition(self):
         result = self.compile_and_run("3+5")
