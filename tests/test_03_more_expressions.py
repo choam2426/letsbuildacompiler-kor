@@ -1,6 +1,5 @@
 import io
 import unittest
-from tests.wasm_util import run_wasm
 from part03_more_expressions import Compiler
 
 
@@ -29,7 +28,7 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "local.set $AXMO",
             ],
         )
-    
+
     def test_expression_assignment(self):
         output = io.StringIO()
         compiler = Compiler("  n2 = 60 / (5 + 1)", output=output)
@@ -47,7 +46,7 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "local.set $N2",
             ],
         )
-    
+
     def test_function_call(self):
         output = io.StringIO()
         compiler = Compiler("result = compute()", output=output)
