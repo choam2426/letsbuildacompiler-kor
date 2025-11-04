@@ -5,11 +5,8 @@ import subprocess
 import tempfile
 
 
-def run_wasm(instrs: str) -> int:
+def run_wasm(code: str) -> int:
     """Compile and run the given WebAssembly text instructions.
-
-    The instructions should form the body of a function that returns an i32.
-    Returns the integer result of running the function.
 
     If the DUMP_WAT environment variable is set, the generated WAT file
     will be kept in the system temp directory for inspection.
@@ -19,11 +16,7 @@ def run_wasm(instrs: str) -> int:
         wasm_path = os.path.join(tempdir, "test.wasm")
 
         with open(wat_path, "w") as f:
-            f.write("(module\n\n")
-            f.write(r"""  (func (export "main") (result i32)""" + "\n")
-            f.write(instrs)
-            f.write("  )\n")
-            f.write(")\n")
+            f.write(code)
 
         # If the env var DUMP_WAT is set, keep the WAT file around.
         if os.getenv("DUMP_WAT"):

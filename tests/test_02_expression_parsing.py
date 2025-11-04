@@ -4,13 +4,24 @@ from tests.wasm_util import run_wasm
 from part02_expression_parsing import Compiler
 
 
+module_template = r"""
+(module
+  (func (export "main") (result i32)
+{instrs}
+  )
+)
+""".lstrip()
+
+
 class TestCompileAndExecute(unittest.TestCase):
     def compile_and_run(self, src: str) -> int:
         output = io.StringIO()
         compiler = Compiler(src, output=output)
         compiler.expression()
         instrs = output.getvalue()
-        return run_wasm(instrs)
+
+        full_code = module_template.format(instrs=instrs)
+        return run_wasm(full_code)
 
     def test_single_number(self):
         result = self.compile_and_run("4")
