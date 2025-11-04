@@ -47,6 +47,20 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "local.set $N2",
             ],
         )
+    
+    def test_function_call(self):
+        output = io.StringIO()
+        compiler = Compiler("result = compute()", output=output)
+        compiler.assignment()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "(local $RESULT i32)",
+                "call $COMPUTE",
+                "local.set $RESULT",
+            ],
+        )
 
 
 if __name__ == "__main__":
