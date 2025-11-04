@@ -121,7 +121,7 @@ class Compiler:
             self.emit_ln("i32.const 0")
         else:
             self.term()
-        while self.look in ("+", "-"):
+        while self.is_addop(self.look):
             if self.look == "+":
                 self.add()
             elif self.look == "-":

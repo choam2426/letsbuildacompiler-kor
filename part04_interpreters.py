@@ -99,7 +99,7 @@ class Interpreter:
         if not self.is_addop(self.look):
             result = self.term()
 
-        while self.look in ("+", "-"):
+        while self.is_addop(self.look):
             if self.look == "+":
                 self.match("+")
                 result += self.term()
