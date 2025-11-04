@@ -22,3 +22,58 @@ Otherwise, small differences due to the built-in capabilities of Python:
   exist as the `isalpha` and `isdigit` methods on `str`.
 * We don't need two separate functions for `Error` and `Abort`, since we raise
   a Python exception in `abort`.
+
+## Part 2: Expression Parsing
+
+This is the first actual compiler for very simple arithmetic expressions made
+up from single-digit numbers. Our code matches the final version of the tutorial
+code that uses the stack for nested computations.
+
+Using the stack is very natural for WASM, because it's a stack-based machine.
+Each compiler method (such as `expression`, `subttract`, `term` and so on)
+leaves its result as a single 32-bit integer on TOS (top of stack). For example,
+the expression `2+3*4` will compile down to:
+
+```
+  i32.const 2
+  i32.const 3
+  i32.const 4
+  i32.mul
+  i32.add
+```
+
+The tests for this part (in `tests/test_02_expression_parsing.py`) include a
+full testing harness that constructs a WASM module with a single "main"
+function, emits the compiled expression into it, and uses `wasm-tools` and
+`wasmtime` to execute it and report the result, which can then be compared
+to an expected value.
+
+## Part 3: More Expressions
+
+This part extends the compiler to properly handle whitespace and support
+multi-digit numbers and multi-character variable names. The compiler it
+constructs is somewhat incomplete, however, since it only hanldes a single
+assignment statement which has no side effects. It also supports function
+calls (with no arguments), but these are emitted without linkage to any actual
+function. All of this is left for later.
+
+Our translation is very faithful to the original tutorial's Pascal code, using
+WASM constructs. Specifically, for the assignment `foo = 42`, we emit:
+
+```
+  (local $FOO i32)
+  i32.const 42
+  local.set $FOO
+```
+
+For a function call such as `foo()`, we emit:
+
+```
+  call $foo
+```
+
+But no such function is defined anywhere. Therefore, the tests for this part
+don't actually execute anything but just do some sanity checking on the
+text of the emitted WASM. We expect that future parts - building on top of
+the base implemented here - will be more amenable to automatic execution
+testing.
