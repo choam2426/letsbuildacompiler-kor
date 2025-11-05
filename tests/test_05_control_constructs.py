@@ -152,6 +152,33 @@ class TestCompilerEmittedSource(unittest.TestCase):
             ],
         )
 
+    def test_nested_loops(self):
+        output = io.StringIO()
+        compiler = Compiler("pmwxeze", output=output)
+        compiler.block()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "loop $loop1",
+                "block $breakloop1",
+                "M",
+                "loop $loop2",
+                "block $breakloop2",
+                "<condition>",
+                "i32.eqz",
+                "br_if $breakloop2",
+                "X",
+                "br $loop2",
+                "end",
+                "end",
+                "Z",
+                "br $loop1",
+                "end",
+                "end",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
