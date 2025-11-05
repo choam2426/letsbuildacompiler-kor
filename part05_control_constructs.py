@@ -62,8 +62,9 @@ class Compiler:
     def emit_ln(self, s: str):
         self.emit(s + "\n")
 
-    def loop_labels_from_id(self, loop_id: int) -> tuple[str, str]:
-        return f"$loop{loop_id}", f"$breakloop{loop_id}"
+    def generate_loop_labels(self) -> tuple[str, str]:
+        self.loopcount += 1
+        return f"$loop{self.loopcount}", f"$breakloop{self.loopcount}"
 
     def condition(self):
         self.emit_ln("<condition>")
@@ -103,10 +104,9 @@ class Compiler:
 
     def do_while(self):
         self.match("w")
-        loop_label, breakloop_label = self.loop_labels_from_id(self.loopcount)
+        loop_label, breakloop_label = self.generate_loop_labels()
         self.emit_ln(f"loop {loop_label}")
         self.emit_ln(f"block {breakloop_label}")
-        self.loopcount += 1
         self.condition()
         # For a while loop the break condition is the inverse of the loop
         # condition.
@@ -120,10 +120,9 @@ class Compiler:
 
     def do_loop(self):
         self.match("p")
-        loop_label, breakloop_label = self.loop_labels_from_id(self.loopcount)
+        loop_label, breakloop_label = self.generate_loop_labels()
         self.emit_ln(f"loop {loop_label}")
         self.emit_ln(f"block {breakloop_label}")
-        self.loopcount += 1
         self.block(breakloop_label)
         self.emit_ln(f"br {loop_label}")
         self.match("e")
