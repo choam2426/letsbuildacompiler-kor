@@ -17,17 +17,17 @@ class TestCompilerEmittedSource(unittest.TestCase):
 
     def test_ifelse(self):
         output = io.StringIO()
-        compiler = Compiler("iorlbe", output=output)
+        compiler = Compiler("iorlxe", output=output)
         compiler.block()
 
         self.assertEqual(
             self.split_emission(output),
-            ["<condition>", "if", "O", "R", "else", "B", "end"],
+            ["<condition>", "if", "O", "R", "else", "X", "end"],
         )
 
     def test_block_before_after_if(self):
         output = io.StringIO()
-        compiler = Compiler("aibced", output=output)
+        compiler = Compiler("aixced", output=output)
         compiler.block()
 
         self.assertEqual(
@@ -36,7 +36,7 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "A",
                 "<condition>",
                 "if",
-                "B",
+                "X",
                 "C",
                 "end",
                 "D",
@@ -45,7 +45,7 @@ class TestCompilerEmittedSource(unittest.TestCase):
 
     def test_nested_if(self):
         output = io.StringIO()
-        compiler = Compiler("iaibece", output=output)
+        compiler = Compiler("iaixeye", output=output)
         compiler.block()
 
         self.assertEqual(
@@ -56,9 +56,9 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "A",
                 "<condition>",
                 "if",
-                "B",
+                "X",
                 "end",
-                "C",
+                "Y",
                 "end",
             ],
         )
@@ -85,6 +85,53 @@ class TestCompilerEmittedSource(unittest.TestCase):
             ],
         )
 
+    def test_while_with_break(self):
+        output = io.StringIO()
+        compiler = Compiler("wxbye", output=output)
+        compiler.block()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "loop $loop0",
+                "block $breakloop0",
+                "<condition>",
+                "i32.eqz",
+                "br_if $breakloop0",
+                "X",
+                "br $breakloop0",
+                "Y",
+                "br $loop0",
+                "end",
+                "end",
+            ],
+        )
+
+    def test_while_break_in_if(self):
+        output = io.StringIO()
+        compiler = Compiler("wixbyeze", output=output)
+        compiler.block()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "loop $loop0",
+                "block $breakloop0",
+                "<condition>",
+                "i32.eqz",
+                "br_if $breakloop0",
+                "<condition>",
+                "if",
+                "X",
+                "br $breakloop0",
+                "Y",
+                "end",
+                "Z",
+                "br $loop0",
+                "end",
+                "end",
+            ],
+        )
 
 if __name__ == "__main__":
     unittest.main()

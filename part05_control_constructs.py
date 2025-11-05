@@ -82,6 +82,8 @@ class Compiler:
                     self.do_if(breakloop_label)
                 case "w":
                     self.do_while()
+                case "b":
+                    self.do_break(breakloop_label)
                 case _:
                     self.other()
 
@@ -114,3 +116,9 @@ class Compiler:
         self.match("e")
         self.emit_ln("end")  # end block
         self.emit_ln("end")  # end loop
+
+    def do_break(self, breakloop_label: str):
+        if breakloop_label == "":
+            self.abort("No loop to break from")
+        self.match("b")
+        self.emit_ln(f"br {breakloop_label}")
