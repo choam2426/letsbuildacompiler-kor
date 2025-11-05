@@ -82,6 +82,8 @@ class Compiler:
                     self.do_if(breakloop_label)
                 case "w":
                     self.do_while()
+                case "p":
+                    self.do_loop()
                 case "b":
                     self.do_break(breakloop_label)
                 case _:
@@ -100,7 +102,6 @@ class Compiler:
         self.emit_ln("end")
 
     def do_while(self):
-        # TODO: handle passing label name for breaks
         self.match("w")
         loop_label, breakloop_label = self.loop_labels_from_id(self.loopcount)
         self.emit_ln(f"loop {loop_label}")
@@ -111,6 +112,18 @@ class Compiler:
         # condition.
         self.emit_ln("i32.eqz")
         self.emit_ln(f"br_if {breakloop_label}")
+        self.block(breakloop_label)
+        self.emit_ln(f"br {loop_label}")
+        self.match("e")
+        self.emit_ln("end")  # end block
+        self.emit_ln("end")  # end loop
+
+    def do_loop(self):
+        self.match("p")
+        loop_label, breakloop_label = self.loop_labels_from_id(self.loopcount)
+        self.emit_ln(f"loop {loop_label}")
+        self.emit_ln(f"block {breakloop_label}")
+        self.loopcount += 1
         self.block(breakloop_label)
         self.emit_ln(f"br {loop_label}")
         self.match("e")

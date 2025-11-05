@@ -133,5 +133,25 @@ class TestCompilerEmittedSource(unittest.TestCase):
             ],
         )
 
+    def test_loop_with_break(self):
+        output = io.StringIO()
+        compiler = Compiler("pxbye", output=output)
+        compiler.block()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "loop $loop0",
+                "block $breakloop0",
+                "X",
+                "br $breakloop0",
+                "Y",
+                "br $loop0",
+                "end",
+                "end",
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
