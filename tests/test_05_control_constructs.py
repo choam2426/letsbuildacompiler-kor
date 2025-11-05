@@ -63,6 +63,28 @@ class TestCompilerEmittedSource(unittest.TestCase):
             ],
         )
 
+    def test_basic_while(self):
+        output = io.StringIO()
+        compiler = Compiler("wxyze", output=output)
+        compiler.block()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "loop $loop0",
+                "block $breakloop0",
+                "<condition>",
+                "i32.eqz",
+                "br_if $breakloop0",
+                "X",
+                "Y",
+                "Z",
+                "br $loop0",
+                "end",
+                "end",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

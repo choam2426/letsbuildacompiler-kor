@@ -8,7 +8,7 @@ class Compiler:
         self.pos = 0
         self.look = ""
         self.output = output
-        self.lcount = 0  # Label counter
+        self.loopcount = 0
 
         # 'Init' from the tutorial: prime the parser by calling get_char.
         self.get_char()
@@ -62,6 +62,9 @@ class Compiler:
     def emit_ln(self, s: str):
         self.emit(s + "\n")
 
+    def loop_labels_from_id(self, loop_id: int) -> tuple[str, str]:
+        return f"$loop{loop_id}", f"$breakloop{loop_id}"
+
     def condition(self):
         self.emit_ln("<condition>")
 
@@ -71,22 +74,43 @@ class Compiler:
     def other(self):
         self.emit_ln(self.get_name())
 
-    def block(self):
+    def block(self, breakloop_label: str = ""):
+        # breakloop_label is used for emitting break statements inside loops.
         while self.look not in ("e", "l", "u", ""):
             match self.look:
                 case "i":
-                    self.do_if()
+                    self.do_if(breakloop_label)
+                case "w":
+                    self.do_while()
                 case _:
                     self.other()
 
-    def do_if(self):
+    def do_if(self, breakloop_label: str = ""):
         self.match("i")
         self.condition()
         self.emit_ln("if")
-        self.block()
+        self.block(breakloop_label)
         if self.look == "l":
             self.match("l")
             self.emit_ln("else")
-            self.block()
+            self.block(breakloop_label)
         self.match("e")
         self.emit_ln("end")
+
+    def do_while(self):
+        # TODO: handle passing label name for breaks
+        self.match("w")
+        loop_label, breakloop_label = self.loop_labels_from_id(self.loopcount)
+        self.emit_ln(f"loop {loop_label}")
+        self.emit_ln(f"block {breakloop_label}")
+        self.loopcount += 1
+        self.condition()
+        # For a while loop the break condition is the inverse of the loop
+        # condition.
+        self.emit_ln("i32.eqz")
+        self.emit_ln(f"br_if {breakloop_label}")
+        self.block(breakloop_label)
+        self.emit_ln(f"br {loop_label}")
+        self.match("e")
+        self.emit_ln("end")  # end block
+        self.emit_ln("end")  # end loop
