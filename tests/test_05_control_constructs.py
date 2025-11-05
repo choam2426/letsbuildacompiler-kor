@@ -15,20 +15,54 @@ class TestCompilerEmittedSource(unittest.TestCase):
             text = str(output)
         return [line.strip() for line in text.splitlines() if line.strip()]
 
-    def test_block(self):
+    def test_ifelse(self):
         output = io.StringIO()
-        compiler = Compiler("iorbe", output=output)
+        compiler = Compiler("iorlbe", output=output)
         compiler.block()
 
-        print(self.split_emission(output))
-        # self.assertEqual(
-        #     self.split_emission(output),
-        #     [
-        #         "(local $AXMO i32)",
-        #         "i32.const 3",
-        #         "local.set $AXMO",
-        #     ],
-        # )
+        self.assertEqual(
+            self.split_emission(output),
+            ["<condition>", "if", "O", "R", "else", "B", "end"],
+        )
+
+    def test_block_before_after_if(self):
+        output = io.StringIO()
+        compiler = Compiler("aibced", output=output)
+        compiler.block()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "A",
+                "<condition>",
+                "if",
+                "B",
+                "C",
+                "end",
+                "D",
+            ],
+        )
+
+    def test_nested_if(self):
+        output = io.StringIO()
+        compiler = Compiler("iaibece", output=output)
+        compiler.block()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "<condition>",
+                "if",
+                "A",
+                "<condition>",
+                "if",
+                "B",
+                "end",
+                "C",
+                "end",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

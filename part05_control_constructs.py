@@ -8,7 +8,7 @@ class Compiler:
         self.pos = 0
         self.look = ""
         self.output = output
-        self.lcount = 0 # Label counter
+        self.lcount = 0  # Label counter
 
         # 'Init' from the tutorial: prime the parser by calling get_char.
         self.get_char()
@@ -61,33 +61,32 @@ class Compiler:
 
     def emit_ln(self, s: str):
         self.emit(s + "\n")
-    
+
     def condition(self):
-        self.emit_ln('<condition>')
-    
+        self.emit_ln("<condition>")
+
     def expression(self):
-        self.emit_ln('<expression>')
+        self.emit_ln("<expression>")
 
     def other(self):
         self.emit_ln(self.get_name())
-    
+
     def block(self):
-        while self.look not in ('e', 'l', 'u', ''):
+        while self.look not in ("e", "l", "u", ""):
             match self.look:
-                case 'i':
+                case "i":
                     self.do_if()
                 case _:
                     self.other()
 
     def do_if(self):
-        self.match('i')
+        self.match("i")
         self.condition()
-        self.emit_ln('if')
+        self.emit_ln("if")
         self.block()
-        if self.look == 'l':
-            self.match('l')
-            self.emit_ln('else')
+        if self.look == "l":
+            self.match("l")
+            self.emit_ln("else")
             self.block()
-        self.match('e')
-        self.emit_ln('end')
-
+        self.match("e")
+        self.emit_ln("end")
