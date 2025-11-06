@@ -198,6 +198,39 @@ class TestCompilerEmittedSource(unittest.TestCase):
             ],
         )
 
+    def test_for_loop(self):
+        output = io.StringIO()
+        compiler = Compiler("ft=xyze", output=output)
+        compiler.block()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "<expression>",
+                "i32.const 1",
+                "i32.sub",
+                "local.set $for0",
+                "<expression>",
+                "loop $loop1",
+                "block $breakloop1",
+                "local.tee $tmp0",
+                "local.get $tmp0",
+                "local.get $for0",
+                "i32.const 1",
+                "i32.add",
+                "local.tee $for0",
+                "i32.ge_u",
+                "br_if $breakloop1",
+                "X",
+                "Y",
+                "Z",
+                "br $loop1",
+                "end",
+                "end",
+                "drop",
+            ],
+        )
+
     def test_nested_loops(self):
         output = io.StringIO()
         compiler = Compiler("pmwxeze", output=output)

@@ -89,6 +89,8 @@ class Compiler:
                     self.do_repeat()
                 case "d":
                     self.do_do()
+                case "f":
+                    self.do_for()
                 case "b":
                     self.do_break(breakloop_label)
                 case _:
@@ -171,6 +173,48 @@ class Compiler:
         self.emit_ln("end")  # end block
         self.emit_ln("end")  # end loop
         self.emit_ln("drop")  # drop the counter left on the stack
+
+    def do_for(self):
+        self.match("f")
+        self.get_name()  # loop variable name, ignored here
+        self.match("=")
+        self.expression()  # initial value, ignored here
+        # NOTE: the original tutorial doesn't match "TO" here, so we won't
+        # either.
+
+        # Pre-decrement the loop counter as per the tutorial.
+        self.emit_ln("i32.const 1")
+        self.emit_ln("i32.sub")
+        self.emit_ln("local.set $for0")  # use $for0 as loop counter
+
+        # Upper limit, compute expression once, save its value on stack.
+        self.expression()
+
+        loop_label, breakloop_label = self.generate_loop_labels()
+        self.emit_ln(f"loop {loop_label}")
+        self.emit_ln(f"block {breakloop_label}")
+
+        # Duplicate upper limit for comparison.
+        self.emit_ln("local.tee $tmp0")
+        self.emit_ln("local.get $tmp0")
+
+        # Push current counter value on TOS and increment it, saving it back
+        # to $tmp0.
+        self.emit_ln("local.get $for0")
+        self.emit_ln("i32.const 1")
+        self.emit_ln("i32.add")
+        self.emit_ln("local.tee $for0")
+
+        # Compare with upper limit.
+        self.emit_ln("i32.ge_u")
+        self.emit_ln(f"br_if {breakloop_label}")
+
+        self.block(breakloop_label)
+        self.emit_ln(f"br {loop_label}")
+        self.match("e")
+        self.emit_ln("end")  # end block
+        self.emit_ln("end")  # end loop
+        self.emit_ln("drop")  # drop the upper limit left on the stack
 
     def do_break(self, breakloop_label: str):
         if breakloop_label == "":
