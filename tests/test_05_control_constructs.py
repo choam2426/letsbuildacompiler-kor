@@ -27,7 +27,7 @@ class TestCompilerEmittedSource(unittest.TestCase):
 
     def test_block_before_after_if(self):
         output = io.StringIO()
-        compiler = Compiler("aixced", output=output)
+        compiler = Compiler("aixcey", output=output)
         compiler.block()
 
         self.assertEqual(
@@ -39,7 +39,7 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "X",
                 "C",
                 "end",
-                "D",
+                "Y",
             ],
         )
 
@@ -169,6 +169,32 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "br_if $loop1",
                 "end",
                 "end",
+            ],
+        )
+
+    def test_do_loop(self):
+        output = io.StringIO()
+        compiler = Compiler("dxye", output=output)
+        compiler.block()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "<expression>",
+                "loop $loop1",
+                "block $breakloop1",
+                "i32.const 1",
+                "i32.sub",
+                "X",
+                "Y",
+                "local.tee $tmp0",
+                "local.get $tmp0",
+                "i32.const 0",
+                "i32.gt_u",
+                "br_if $loop1",
+                "end",
+                "end",
+                "drop",
             ],
         )
 

@@ -87,6 +87,8 @@ class Compiler:
                     self.do_loop()
                 case "r":
                     self.do_repeat()
+                case "d":
+                    self.do_do()
                 case "b":
                     self.do_break(breakloop_label)
                 case _:
@@ -145,6 +147,30 @@ class Compiler:
         self.emit_ln(f"br_if {loop_label}")
         self.emit_ln("end")  # end block
         self.emit_ln("end")  # end loop
+
+    def do_do(self):
+        self.match("d")
+        self.expression()
+        loop_label, breakloop_label = self.generate_loop_labels()
+        self.emit_ln(f"loop {loop_label}")
+        self.emit_ln(f"block {breakloop_label}")
+        # We assume expression left an i32 value on the stack, which is how
+        # many times we repeat the loop.
+
+        self.emit_ln("i32.const 1")
+        self.emit_ln("i32.sub")
+        self.block(breakloop_label)
+        self.match("e")
+        # Use $tmp0 local as a temporary to duplicate the counter value, so it
+        # can be compared with 0 but also remain on TOS for the next iteration.
+        self.emit_ln("local.tee $tmp0")
+        self.emit_ln("local.get $tmp0")
+        self.emit_ln("i32.const 0")
+        self.emit_ln("i32.gt_u")
+        self.emit_ln(f"br_if {loop_label}")
+        self.emit_ln("end")  # end block
+        self.emit_ln("end")  # end loop
+        self.emit_ln("drop")  # drop the counter left on the stack
 
     def do_break(self, breakloop_label: str):
         if breakloop_label == "":
