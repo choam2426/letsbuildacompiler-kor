@@ -85,6 +85,8 @@ class Compiler:
                     self.do_while()
                 case "p":
                     self.do_loop()
+                case "r":
+                    self.do_repeat()
                 case "b":
                     self.do_break(breakloop_label)
                 case _:
@@ -126,6 +128,21 @@ class Compiler:
         self.block(breakloop_label)
         self.emit_ln(f"br {loop_label}")
         self.match("e")
+        self.emit_ln("end")  # end block
+        self.emit_ln("end")  # end loop
+
+    def do_repeat(self):
+        self.match("r")
+        loop_label, breakloop_label = self.generate_loop_labels()
+        self.emit_ln(f"loop {loop_label}")
+        self.emit_ln(f"block {breakloop_label}")
+        self.block(breakloop_label)
+        self.match("u")
+        self.condition()
+        # The 'until' condition dictates when to break, so we just branch back
+        # to the loop if the condition is false.
+        self.emit_ln("i32.eqz")
+        self.emit_ln(f"br_if {loop_label}")
         self.emit_ln("end")  # end block
         self.emit_ln("end")  # end loop
 

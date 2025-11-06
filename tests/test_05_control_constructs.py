@@ -17,12 +17,12 @@ class TestCompilerEmittedSource(unittest.TestCase):
 
     def test_ifelse(self):
         output = io.StringIO()
-        compiler = Compiler("iorlxe", output=output)
+        compiler = Compiler("ioylxe", output=output)
         compiler.block()
 
         self.assertEqual(
             self.split_emission(output),
-            ["<condition>", "if", "O", "R", "else", "X", "end"],
+            ["<condition>", "if", "O", "Y", "else", "X", "end"],
         )
 
     def test_block_before_after_if(self):
@@ -147,6 +147,26 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "br $breakloop1",
                 "Y",
                 "br $loop1",
+                "end",
+                "end",
+            ],
+        )
+
+    def test_repeat_loop(self):
+        output = io.StringIO()
+        compiler = Compiler("rxyu", output=output)
+        compiler.block()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "loop $loop1",
+                "block $breakloop1",
+                "X",
+                "Y",
+                "<condition>",
+                "i32.eqz",
+                "br_if $loop1",
                 "end",
                 "end",
             ],
