@@ -98,3 +98,70 @@ properly implement nesting of recursive-descent calls. For example, in `Term` it
 starts by obtaining the value with `GetNum` rather than with `Factor`. This
 means nested expressions (with parentheses) won't be supported. Our
 `Interpreter` fixes this and similar issues.
+
+## Part 5: Control Constructs
+
+This part is another detour, into parsing / emitting code for control
+structures. The parser is back to accepting single-character tokens, and
+therefore the front-end is only useful for experimentation. Here's some
+sample input:
+
+```
+wixbyeze
+```
+
+This means:
+
+```
+while <condition>
+  if <condition>
+    x
+    break
+    y
+  else
+    z
+  end
+end
+```
+
+There is a lot this part leaves out, such as actually parsing / emitting
+conditions, experssions and so on. It focuses on how to properly emit loops
+of many different kinds.
+
+Our code follows this closely, translated to WASM looping constructs. The basic
+WASM loop structure is:
+
+```
+loop $looplabel
+  block $breaklooplabel
+    # branching to $breaklooplabel exits the loop
+    # branching to $looplabel continues to the next iteration    
+  end
+end
+```
+
+Whereas for `IF...THEN...ELSE` the situation is even simpler, since WASM
+supports blocks like:
+
+```
+if
+  # code
+else
+  # code
+end
+```
+
+This lets us implement all the different conditional and loop constructs, as
+well as BREAK statements.
+
+Another tricky issue this part demonstrates is stack management. Some of the
+loops (DO and FOR) keep values on TOS across iterations. This needs to be
+carefully managed by the emitted code. We try to follow the original tutorial
+as closely as possible here, including using a local for the loop variable
+in FOR.
+
+The original tutorial also has several bugs (like forgetting to emit certain
+expressions and matching TO in FOR loops). I'm fairly certain Jack Crenshaw
+didn't run the code emitted in this part; rather it's preparation for future
+parts. I expect the code here will be thoroughly tested later; for now, we only
+have textual emission tests for sanity checking.
