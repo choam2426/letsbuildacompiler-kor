@@ -73,7 +73,7 @@ class Compiler:
             self.match(")")
             self.emit_ln(f"call ${name}")
         else:
-            self.emit_ln(f"local.get {name}")
+            self.emit_ln(f"local.get ${name}")
 
     def factor(self):
         if self.look == "(":
