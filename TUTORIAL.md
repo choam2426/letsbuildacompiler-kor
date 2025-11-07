@@ -169,3 +169,6 @@ have textual emission tests for sanity checking.
 ## Part 6: Boolean Expressions
 
 TODO: note bug in Factor -- should be bool_expression (BNF is correct)
+
+Talk about how testing is done, var decls etc.
+

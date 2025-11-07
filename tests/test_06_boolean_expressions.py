@@ -1,6 +1,36 @@
 import io
 import unittest
+from wasm_util import run_wasm
 from part06_boolean_expressions import Compiler
+
+
+module_template = r"""
+(module
+  (func (export "main") (result i32)
+    (local $X i32)
+    (local $Y i32)
+    (local $Z i32)
+{instrs}
+    ;; For testing, the function always returns the value of X.
+    local.get $X
+  )
+)
+""".lstrip()
+
+
+class TestCompileAndExecute(unittest.TestCase):
+    def compile_and_run(self, src: str) -> int:
+        output = io.StringIO()
+        compiler = Compiler(src, output=output)
+        compiler.block()
+        instrs = output.getvalue()
+
+        full_code = module_template.format(instrs=instrs)
+        return run_wasm(full_code)
+
+    def test_single_assignment(self):
+        result = self.compile_and_run("x=4")
+        self.assertEqual(result, 4)
 
 
 class TestCompilerEmittedSource(unittest.TestCase):
@@ -23,7 +53,6 @@ class TestCompilerEmittedSource(unittest.TestCase):
         self.assertEqual(
             self.split_emission(output),
             [
-                "(local $X i32)",
                 "i32.const 3",
                 "local.set $X",
             ],
@@ -37,7 +66,6 @@ class TestCompilerEmittedSource(unittest.TestCase):
         self.assertEqual(
             self.split_emission(output),
             [
-                "(local $X i32)",
                 "local.get $Y",
                 "i32.const 3",
                 "i32.lt_s",
@@ -53,7 +81,6 @@ class TestCompilerEmittedSource(unittest.TestCase):
         self.assertEqual(
             self.split_emission(output),
             [
-                "(local $X i32)",
                 "local.get $Y",
                 "i32.const 5",
                 "i32.add",
@@ -63,6 +90,37 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "i32.const 3",
                 "i32.lt_s",
                 "i32.and",
+                "local.set $X",
+            ],
+        )
+    
+    def test_unary_minus_plus(self):
+        # In this part we've changed how unary signs are handled; test
+        # these here.
+        output = io.StringIO()
+        compiler = Compiler("X = -Y", output=output)
+        compiler.assignment()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "local.get $Y",
+                "i32.const -1",
+                "i32.mul",
+                "local.set $X",
+            ],
+        )
+
+        output = io.StringIO()
+        compiler = Compiler("X = -2 - +Y", output=output)
+        compiler.assignment()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "i32.const -2",
+                "local.get $Y",
+                "i32.sub",
                 "local.set $X",
             ],
         )

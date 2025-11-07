@@ -105,6 +105,7 @@ class Compiler:
     def signed_factor(self):
         if self.look == "+":
             self.match("+")
+            self.factor()
         elif self.look == "-":
             self.match("-")
             if self.look.isdigit():
@@ -157,12 +158,7 @@ class Compiler:
         self.emit_ln("i32.sub")
 
     def expression(self):
-        # For handling unary + and - operators, emit a zero first and then
-        # proceed as usual.
-        if self.is_addop(self.look):
-            self.emit_ln("i32.const 0")
-        else:
-            self.term()
+        self.term()
         while self.is_addop(self.look):
             if self.look == "+":
                 self.add()
@@ -245,6 +241,26 @@ class Compiler:
     def assignment(self):
         name = self.get_name()
         self.match("=")
-        self.emit_ln(f"(local ${name} i32)")
         self.bool_expression()
         self.emit_ln(f"local.set ${name}")
+
+    def block(self, breakloop_label: str = ""):
+        # breakloop_label is used for emitting break statements inside loops.
+        while self.look not in ("e", "l", "u", ""):
+            match self.look:
+                case "i":
+                    self.do_if(breakloop_label)
+                case "w":
+                    self.do_while()
+                case "p":
+                    self.do_loop()
+                case "r":
+                    self.do_repeat()
+                case "d":
+                    self.do_do()
+                case "f":
+                    self.do_for()
+                case "b":
+                    self.do_break(breakloop_label)
+                case _:
+                    self.assignment()
