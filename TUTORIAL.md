@@ -165,3 +165,7 @@ expressions and matching TO in FOR loops). I'm fairly certain Jack Crenshaw
 didn't run the code emitted in this part; rather it's preparation for future
 parts. I expect the code here will be thoroughly tested later; for now, we only
 have textual emission tests for sanity checking.
+
+## Part 6: Boolean Expressions
+
+TODO: note bug in Factor -- should be bool_expression (BNF is correct)

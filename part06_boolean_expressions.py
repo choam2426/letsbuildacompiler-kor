@@ -17,14 +17,6 @@ import sys
 #
 # <relation>        ::= <expression> [<relop> <expression>]
 
-# TODO: rewrite for part 6
-# Implement the logical operations, combine with arithmetic expressions
-# and pick up the IF..THEN...ELSE construct from part 5. This should be
-# enought to compile some real programs (in the weird one-char language)
-# and have execution tests!
-# Port one kind of loops too...
-
-
 class Compiler:
     def __init__(self, src: str, output: TextIO = sys.stdout):
         self.src = src
@@ -110,10 +102,25 @@ class Compiler:
         else:
             self.emit_ln(f"local.get ${name}")
 
+    def signed_factor(self):
+        if self.look == "+":
+            self.match("+")
+        elif self.look == "-":
+            self.match("-")
+            if self.look.isdigit():
+                s = self.get_num()
+                self.emit_ln(f"i32.const -{s}")
+            else:
+                self.factor()
+                self.emit_ln("i32.const -1")
+                self.emit_ln("i32.mul")
+        else:
+            self.factor()
+
     def factor(self):
         if self.look == "(":
             self.match("(")
-            self.expression()
+            self.bool_expression()
             self.match(")")
         elif self.look.isalpha():
             self.ident()
@@ -132,7 +139,7 @@ class Compiler:
         self.emit_ln("i32.div_s")
 
     def term(self):
-        self.factor()
+        self.signed_factor()
         while self.look in ("*", "/"):
             if self.look == "*":
                 self.multiply()

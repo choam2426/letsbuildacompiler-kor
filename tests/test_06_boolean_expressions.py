@@ -45,6 +45,28 @@ class TestCompilerEmittedSource(unittest.TestCase):
             ],
         )
 
+    def test_longer_boolean_expression(self):
+        output = io.StringIO()
+        compiler = Compiler("X = (Y + 5 = 9) & (Z < 3)", output=output)
+        compiler.assignment()
+
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "(local $X i32)",
+                "local.get $Y",
+                "i32.const 5",
+                "i32.add",
+                "i32.const 9",
+                "i32.eq",
+                "local.get $Z",
+                "i32.const 3",
+                "i32.lt_s",
+                "i32.and",
+                "local.set $X",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
