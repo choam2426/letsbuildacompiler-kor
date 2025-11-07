@@ -2,7 +2,7 @@ from typing import TextIO
 import sys
 
 # BNF from the original tutorial
-# 
+#
 # <expression>      ::= <term> [<addop> <term>]*
 # <term>            ::= <signed factor> [<mulop> <factor>]*
 # <signed factor>   ::= [<addop>] <factor>
@@ -23,6 +23,7 @@ import sys
 # enought to compile some real programs (in the weird one-char language)
 # and have execution tests!
 # Port one kind of loops too...
+
 
 class Compiler:
     def __init__(self, src: str, output: TextIO = sys.stdout):
@@ -60,27 +61,39 @@ class Compiler:
             self.expected(f"'{x}'")
 
     def get_name(self) -> str:
+        # Note: for part 6, we're back to only supporting single-letter names.
         if not self.look.isalpha():
             self.expected("Name")
-        name = ""
-        while self.look.isalnum():
-            name += self.look.upper()
-            self.get_char()
+        name = self.look.upper()
+        self.get_char()
         self.skip_white()
         return name
 
     def get_num(self) -> str:
+        # Note: for part 6, we're back to only supporting single-digit numbers.
         if not self.look.isdigit():
             self.expected("Integer")
-        num = ""
-        while self.look.isdigit():
-            num += self.look
-            self.get_char()
+        num = self.look
+        self.get_char()
         self.skip_white()
         return num
 
+    def get_boolean(self) -> bool:
+        if not self.is_boolean(self.look):
+            self.expected("Boolean")
+        value = self.look.upper() == "T"
+        self.get_char()
+        self.skip_white()
+        return value
+
     def is_addop(self, c: str) -> bool:
         return c in ("+", "-")
+
+    def is_boolean(self, c: str) -> bool:
+        return c.upper() in ("T", "F")
+
+    def is_relop(self, c: str) -> bool:
+        return c in ("=", "#", "<", ">")
 
     def emit(self, s: str):
         self.output.write("    " + s)
@@ -149,9 +162,82 @@ class Compiler:
             elif self.look == "-":
                 self.subtract()
 
+    def bool_or(self):
+        self.match("|")
+        self.bool_term()
+        self.emit_ln("i32.or")
+
+    def bool_xor(self):
+        self.match("~")
+        self.bool_term()
+        self.emit_ln("i32.xor")
+
+    def bool_expression(self):
+        self.bool_term()
+        while self.look in ("|", "~"):
+            if self.look == "|":
+                self.bool_or()
+            elif self.look == "~":
+                self.bool_xor()
+
+    def bool_term(self):
+        self.not_factor()
+        while self.look == "&":
+            self.match("&")
+            self.not_factor()
+            self.emit_ln("i32.and")
+
+    def not_factor(self):
+        if self.look == "!":
+            self.match("!")
+            self.bool_factor()
+            self.emit_ln("i32.eqz")
+        else:
+            self.bool_factor()
+
+    def bool_factor(self):
+        if self.is_boolean(self.look):
+            value = self.get_boolean()
+            val_int = 1 if value else 0
+            self.emit_ln(f"i32.const {val_int}")
+        else:
+            self.relation()
+
+    def equals(self):
+        self.match("=")
+        self.expression()
+        self.emit_ln("i32.eq")
+
+    def not_equals(self):
+        self.match("#")
+        self.expression()
+        self.emit_ln("i32.ne")
+
+    def less_than(self):
+        self.match("<")
+        self.expression()
+        self.emit_ln("i32.lt_s")
+
+    def greater_than(self):
+        self.match(">")
+        self.expression()
+        self.emit_ln("i32.gt_s")
+
+    def relation(self):
+        self.expression()
+        match self.look:
+            case "=":
+                self.equals()
+            case "#":
+                self.not_equals()
+            case "<":
+                self.less_than()
+            case ">":
+                self.greater_than()
+
     def assignment(self):
         name = self.get_name()
         self.match("=")
         self.emit_ln(f"(local ${name} i32)")
-        self.expression()
+        self.bool_expression()
         self.emit_ln(f"local.set ${name}")
