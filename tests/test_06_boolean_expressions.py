@@ -1,6 +1,6 @@
 import io
 import unittest
-from wasm_util import run_wasm
+from tests.wasm_util import run_wasm
 from part06_boolean_expressions import Compiler
 
 
@@ -32,6 +32,26 @@ class TestCompileAndExecute(unittest.TestCase):
         result = self.compile_and_run("x=4")
         self.assertEqual(result, 4)
 
+        result = self.compile_and_run("x=5*(3+4)")
+        self.assertEqual(result, 35)
+
+    def test_boolean_expression(self):
+        result = self.compile_and_run("X = 2 < 3")
+        self.assertEqual(result, 1)
+
+        result = self.compile_and_run("X = 5 = 2")
+        self.assertEqual(result, 0)
+
+        result = self.compile_and_run("X = 4 > 7")
+        self.assertEqual(result, 0)
+
+    def test_multiple_assignments(self):
+        result = self.compile_and_run("Y = 2  Z = 3  X = Y * Z")
+        self.assertEqual(result, 6)
+
+        result = self.compile_and_run("Y = 1  X = Y+8  X = X*9")
+        self.assertEqual(result, 81)
+
 
 class TestCompilerEmittedSource(unittest.TestCase):
     def split_emission(self, output):
@@ -57,7 +77,7 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "local.set $X",
             ],
         )
-    
+
     def test_boolean_expression_assignment(self):
         output = io.StringIO()
         compiler = Compiler("X = Y < 3", output=output)
@@ -93,7 +113,7 @@ class TestCompilerEmittedSource(unittest.TestCase):
                 "local.set $X",
             ],
         )
-    
+
     def test_unary_minus_plus(self):
         # In this part we've changed how unary signs are handled; test
         # these here.

@@ -17,6 +17,7 @@ import sys
 #
 # <relation>        ::= <expression> [<relop> <expression>]
 
+
 class Compiler:
     def __init__(self, src: str, output: TextIO = sys.stdout):
         self.src = src
@@ -248,19 +249,19 @@ class Compiler:
         # breakloop_label is used for emitting break statements inside loops.
         while self.look not in ("e", "l", "u", ""):
             match self.look:
-                case "i":
-                    self.do_if(breakloop_label)
-                case "w":
-                    self.do_while()
-                case "p":
-                    self.do_loop()
-                case "r":
-                    self.do_repeat()
-                case "d":
-                    self.do_do()
-                case "f":
-                    self.do_for()
-                case "b":
-                    self.do_break(breakloop_label)
+                # case "i":
+                #     self.do_if(breakloop_label)
+                # case "w":
+                #     self.do_while()
+                # case "p":
+                #     self.do_loop()
+                # case "r":
+                #     self.do_repeat()
+                # case "d":
+                #     self.do_do()
+                # case "f":
+                #     self.do_for()
+                # case "b":
+                #     self.do_break(breakloop_label)
                 case _:
                     self.assignment()
