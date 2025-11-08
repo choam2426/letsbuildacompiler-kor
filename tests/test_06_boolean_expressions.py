@@ -10,6 +10,7 @@ module_template = r"""
     (local $X i32)
     (local $Y i32)
     (local $Z i32)
+    (local $loopvar1 i32)
 {instrs}
     ;; For testing, the function always returns the value of X.
     local.get $X
@@ -159,6 +160,18 @@ class TestCompileAndExecute(unittest.TestCase):
         """
         )
         self.assertEqual(result, 6)
+
+    def test_do_loop(self):
+        result = self.compile_and_run(
+            r"""
+            Y = 3
+            X = 0
+            d Y + 1
+                X = X + 2
+            e
+        """, show=True
+        )
+        self.assertEqual(result, 8)
 
 
 class TestCompilerEmittedSource(unittest.TestCase):

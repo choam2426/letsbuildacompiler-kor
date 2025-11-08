@@ -125,7 +125,7 @@ end
 ```
 
 There is a lot this part leaves out, such as actually parsing / emitting
-conditions, experssions and so on. It focuses on how to properly emit loops
+conditions, expressions and so on. It focuses on how to properly emit loops
 of many different kinds.
 
 Our code follows this closely, translated to WASM looping constructs. The basic
@@ -159,6 +159,7 @@ loops (DO and FOR) keep values on TOS across iterations. This needs to be
 carefully managed by the emitted code. We try to follow the original tutorial
 as closely as possible here, including using a local for the loop variable
 in FOR.
+TODO: revisit this with the new structure of loopvars
 
 The original tutorial also has several bugs (like forgetting to emit certain
 expressions and matching TO in FOR loops). I'm fairly certain Jack Crenshaw
@@ -169,6 +170,7 @@ have textual emission tests for sanity checking.
 ## Part 6: Boolean Expressions
 
 TODO: note bug in Factor -- should be bool_expression (BNF is correct)
+Mention my skip_white, not doing Fin.
 
-Talk about how testing is done, var decls etc.
+Talk about how testing is done, var decls etc, including tmp0
 

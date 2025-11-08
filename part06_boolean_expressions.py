@@ -95,9 +95,13 @@ class Compiler:
     def emit_ln(self, s: str):
         self.emit(s + "\n")
 
-    def generate_loop_labels(self) -> tuple[str, str]:
+    def generate_loop_labels(self) -> dict[str, str]:
         self.loopcount += 1
-        return f"$loop{self.loopcount}", f"$breakloop{self.loopcount}"
+        return {
+            "loop": f"$loop{self.loopcount}",
+            "break": f"$breakloop{self.loopcount}",
+            "var": f"$loopvar{self.loopcount}",
+        }
 
     def ident(self):
         name = self.get_name()
@@ -270,43 +274,65 @@ class Compiler:
 
     def do_while(self):
         self.match("w")
-        loop_label, breakloop_label = self.generate_loop_labels()
-        self.emit_ln(f"loop {loop_label}")
-        self.emit_ln(f"block {breakloop_label}")
+        labels = self.generate_loop_labels()
+        self.emit_ln(f"loop {labels['loop']}")
+        self.emit_ln(f"block {labels['break']}")
         self.bool_expression()
         # For a while loop the break condition is the inverse of the loop
         # condition.
         self.emit_ln("i32.eqz")
-        self.emit_ln(f"br_if {breakloop_label}")
-        self.block(breakloop_label)
-        self.emit_ln(f"br {loop_label}")
+        self.emit_ln(f"br_if {labels['break']}")
+        self.block(labels["break"])
+        self.emit_ln(f"br {labels['loop']}")
         self.match("e")
         self.emit_ln("end")  # end block
         self.emit_ln("end")  # end loop
 
     def do_loop(self):
         self.match("p")
-        loop_label, breakloop_label = self.generate_loop_labels()
-        self.emit_ln(f"loop {loop_label}")
-        self.emit_ln(f"block {breakloop_label}")
-        self.block(breakloop_label)
-        self.emit_ln(f"br {loop_label}")
+        labels = self.generate_loop_labels()
+        self.emit_ln(f"loop {labels['loop']}")
+        self.emit_ln(f"block {labels['break']}")
+        self.block(labels["break"])
+        self.emit_ln(f"br {labels['loop']}")
         self.match("e")
         self.emit_ln("end")  # end block
         self.emit_ln("end")  # end loop
 
     def do_repeat(self):
         self.match("r")
-        loop_label, breakloop_label = self.generate_loop_labels()
-        self.emit_ln(f"loop {loop_label}")
-        self.emit_ln(f"block {breakloop_label}")
-        self.block(breakloop_label)
+        labels = self.generate_loop_labels()
+        self.emit_ln(f"loop {labels['loop']}")
+        self.emit_ln(f"block {labels['break']}")
+        self.block(labels["break"])
         self.match("u")
         self.bool_expression()
         # The 'until' condition dictates when to break, so we just branch back
         # to the loop if the condition is false.
         self.emit_ln("i32.eqz")
-        self.emit_ln(f"br_if {loop_label}")
+        self.emit_ln(f"br_if {labels['loop']}")
+        self.emit_ln("end")  # end block
+        self.emit_ln("end")  # end loop
+
+    def do_do(self):
+        self.match("d")
+        self.expression()
+        labels = self.generate_loop_labels()
+
+        # The loopvar starts with the value of the expression.
+        self.emit_ln(f"local.set {labels['var']}")
+        self.emit_ln(f"loop {labels['loop']}")
+        self.emit_ln(f"block {labels['break']}")
+        self.emit_ln(f"local.get {labels['var']}")
+        self.emit_ln("i32.const 1")
+        self.emit_ln("i32.sub")
+        self.emit_ln(f"local.set {labels['var']}")
+        self.block(labels["break"])
+        self.match("e")
+        self.emit_ln(f"local.get {labels['var']}")
+        self.emit_ln("i32.const 0")
+        self.emit_ln("i32.gt_s")
+        self.emit_ln(f"br_if {labels['loop']}")
         self.emit_ln("end")  # end block
         self.emit_ln("end")  # end loop
 
@@ -322,8 +348,8 @@ class Compiler:
                     self.do_loop()
                 case "r":
                     self.do_repeat()
-                # case "d":
-                #     self.do_do()
+                case "d":
+                    self.do_do()
                 # case "f":
                 #     self.do_for()
                 case "b":
