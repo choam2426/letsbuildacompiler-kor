@@ -19,13 +19,17 @@ module_template = r"""
 
 
 class TestCompileAndExecute(unittest.TestCase):
-    def compile_and_run(self, src: str) -> int:
+    def compile_and_run(self, src: str, show=False) -> int:
         output = io.StringIO()
         compiler = Compiler(src, output=output)
         compiler.block()
         instrs = output.getvalue()
 
         full_code = module_template.format(instrs=instrs)
+        if show:
+            print("--------- WASM CODE ---------")
+            print(full_code)
+            print("-----------------------------")
         return run_wasm(full_code)
 
     def test_single_assignment(self):
@@ -87,6 +91,44 @@ class TestCompileAndExecute(unittest.TestCase):
 
         result = self.compile_and_run(code.format(yval=9))
         self.assertEqual(result, 7)
+
+    def test_while_loop(self):
+        result = self.compile_and_run(r"""
+            Y = 3
+            X = 0
+            w Y > 0
+                X = X + 2
+                Y = Y - 1
+            e
+        """)
+        self.assertEqual(result, 6)
+
+        # Loop not entered
+        result = self.compile_and_run(r"""
+            Y = 3
+            X = 0
+            w Y > 3
+                X = X + 2
+                Y = Y - 1
+            e
+        """)
+        self.assertEqual(result, 0)
+
+        # Loop with break that's triggered
+        result = self.compile_and_run(
+            r"""
+            Y = 3
+            X = 0
+            w Y > 0
+                i Y = 1
+                    b
+                e
+                X = X + 2
+                Y = Y - 1
+            e
+        """
+        )
+        self.assertEqual(result, 4)
 
 
 class TestCompilerEmittedSource(unittest.TestCase):

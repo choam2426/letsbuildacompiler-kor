@@ -24,6 +24,7 @@ class Compiler:
         self.pos = 0
         self.look = ""
         self.output = output
+        self.loopcount = 0
 
         # 'Init' from the tutorial: prime the parser by calling get_char.
         self.get_char()
@@ -93,6 +94,10 @@ class Compiler:
 
     def emit_ln(self, s: str):
         self.emit(s + "\n")
+
+    def generate_loop_labels(self) -> tuple[str, str]:
+        self.loopcount += 1
+        return f"$loop{self.loopcount}", f"$breakloop{self.loopcount}"
 
     def ident(self):
         name = self.get_name()
@@ -257,17 +262,36 @@ class Compiler:
         self.match("e")
         self.emit_ln("end")
 
-    def block(self, breakloop_label: str = ""):
-        # TODO: now start hooking up control constructs, condition etc.
-        # at least the if and one loop...
+    def do_break(self, breakloop_label: str):
+        if breakloop_label == "":
+            self.abort("No loop to break from")
+        self.match("b")
+        self.emit_ln(f"br {breakloop_label}")
 
+    def do_while(self):
+        self.match("w")
+        loop_label, breakloop_label = self.generate_loop_labels()
+        self.emit_ln(f"loop {loop_label}")
+        self.emit_ln(f"block {breakloop_label}")
+        self.bool_expression()
+        # For a while loop the break condition is the inverse of the loop
+        # condition.
+        self.emit_ln("i32.eqz")
+        self.emit_ln(f"br_if {breakloop_label}")
+        self.block(breakloop_label)
+        self.emit_ln(f"br {loop_label}")
+        self.match("e")
+        self.emit_ln("end")  # end block
+        self.emit_ln("end")  # end loop
+
+    def block(self, breakloop_label: str = ""):
         # breakloop_label is used for emitting break statements inside loops.
         while self.look not in ("e", "l", "u", ""):
             match self.look:
                 case "i":
                     self.do_if(breakloop_label)
-                # case "w":
-                #     self.do_while()
+                case "w":
+                    self.do_while()
                 # case "p":
                 #     self.do_loop()
                 # case "r":
@@ -276,7 +300,7 @@ class Compiler:
                 #     self.do_do()
                 # case "f":
                 #     self.do_for()
-                # case "b":
-                #     self.do_break(breakloop_label)
+                case "b":
+                    self.do_break(breakloop_label)
                 case _:
                     self.assignment()
