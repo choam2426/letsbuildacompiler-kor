@@ -101,6 +101,7 @@ class Compiler:
             "loop": f"$loop{self.loopcount}",
             "break": f"$breakloop{self.loopcount}",
             "var": f"$loopvar{self.loopcount}",
+            "limit": f"$looplimit{self.loopcount}",
         }
 
     def ident(self):
@@ -336,6 +337,43 @@ class Compiler:
         self.emit_ln("end")  # end block
         self.emit_ln("end")  # end loop
 
+    def do_for(self):
+        self.match("f")
+        labels = self.generate_loop_labels()
+        self.get_name()  # loop variable name, ignored here
+        self.match("=")
+
+        # Loop var starts with initial_value - 1, per the tutorial (because
+        # we increment it on each iteration before checking against the limit).
+        self.expression()
+        self.emit_ln("i32.const 1")
+        self.emit_ln("i32.sub")
+        self.emit_ln(f"local.set {labels['var']}")
+        # NOTE: the original tutorial doesn't match "TO" here, so we won't
+        # either.
+
+        # Upper limit: compute expression once, save its value in the loop limit
+        # variable.
+        self.expression()
+        self.emit_ln(f"local.set {labels['limit']}")
+        self.emit_ln(f"loop {labels['loop']}")
+        self.emit_ln(f"block {labels['break']}")
+
+        # Fetch the loop variable, increment it and compare to the limit.
+        self.emit_ln(f"local.get {labels['var']}")
+        self.emit_ln("i32.const 1")
+        self.emit_ln("i32.add")
+        self.emit_ln(f"local.tee {labels['var']}")
+        self.emit_ln(f"local.get {labels['limit']}")
+        self.emit_ln("i32.ge_s")
+        self.emit_ln(f"br_if {labels['break']}")
+
+        self.block(labels["break"])
+        self.emit_ln(f"br {labels['loop']}")
+        self.match("e")
+        self.emit_ln("end")  # end block
+        self.emit_ln("end")  # end loop
+
     def block(self, breakloop_label: str = ""):
         # breakloop_label is used for emitting break statements inside loops.
         while self.look not in ("e", "l", "u", ""):
@@ -350,8 +388,8 @@ class Compiler:
                     self.do_repeat()
                 case "d":
                     self.do_do()
-                # case "f":
-                #     self.do_for()
+                case "f":
+                    self.do_for()
                 case "b":
                     self.do_break(breakloop_label)
                 case _:

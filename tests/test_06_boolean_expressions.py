@@ -11,6 +11,7 @@ module_template = r"""
     (local $Y i32)
     (local $Z i32)
     (local $loopvar1 i32)
+    (local $looplimit1 i32)
 {instrs}
     ;; For testing, the function always returns the value of X.
     local.get $X
@@ -169,7 +170,46 @@ class TestCompileAndExecute(unittest.TestCase):
             d Y + 1
                 X = X + 2
             e
-        """, show=True
+        """
+        )
+        self.assertEqual(result, 8)
+
+    def test_for_loop(self):
+        result = self.compile_and_run(
+            r"""
+            X = 1
+            f I = 0   6
+                X = X * 2
+            e
+        """
+        )
+        self.assertEqual(result, 64)
+
+        # Test with a computed upper limit
+        result = self.compile_and_run(
+            r"""
+            X = 1
+            Y = 1
+            Z = 3
+            f I = 0   Z+X
+                Y = Y * 3
+            e
+            X = Y
+        """
+        )
+        self.assertEqual(result, 81)
+
+        # Test with a break
+        result = self.compile_and_run(
+            r"""
+            X = 1
+            f I = 0   9
+                i X = 8
+                    b
+                e
+                X = X * 2
+            e
+        """
         )
         self.assertEqual(result, 8)
 
