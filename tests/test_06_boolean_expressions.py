@@ -52,6 +52,42 @@ class TestCompileAndExecute(unittest.TestCase):
         result = self.compile_and_run("Y = 1  X = Y+8  X = X*9")
         self.assertEqual(result, 81)
 
+    def test_basic_if(self):
+        result = self.compile_and_run("Y = 5  X = 0  i Y > 3  X = 9 e")
+        self.assertEqual(result, 9)
+
+        result = self.compile_and_run("Y = 2  X = 0  i Y > 3  X = 9 e")
+        self.assertEqual(result, 0)
+
+    def test_if_else(self):
+        result = self.compile_and_run("Y = 5  X = 0  i Y < 3  X = 9 l X = 7 e")
+        self.assertEqual(result, 7)
+
+        result = self.compile_and_run("Y = 2  X = 0  i Y < 3  X = 9 l X = 7 e")
+        self.assertEqual(result, 9)
+
+    def test_nested_if(self):
+        code = r"""
+            Y = {yval}
+            X = 0
+            i Y < 3
+                X = 9
+            l
+                i Y = 5
+                    X = 8
+                l
+                    X = 7
+                e
+            e"""
+        result = self.compile_and_run(code.format(yval=2))
+        self.assertEqual(result, 9)
+
+        result = self.compile_and_run(code.format(yval=5))
+        self.assertEqual(result, 8)
+
+        result = self.compile_and_run(code.format(yval=9))
+        self.assertEqual(result, 7)
+
 
 class TestCompilerEmittedSource(unittest.TestCase):
     def split_emission(self, output):

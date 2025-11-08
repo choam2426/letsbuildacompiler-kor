@@ -245,12 +245,27 @@ class Compiler:
         self.bool_expression()
         self.emit_ln(f"local.set ${name}")
 
+    def do_if(self, breakloop_label: str = ""):
+        self.match("i")
+        self.bool_expression()
+        self.emit_ln("if")
+        self.block(breakloop_label)
+        if self.look == "l":
+            self.match("l")
+            self.emit_ln("else")
+            self.block(breakloop_label)
+        self.match("e")
+        self.emit_ln("end")
+
     def block(self, breakloop_label: str = ""):
+        # TODO: now start hooking up control constructs, condition etc.
+        # at least the if and one loop...
+
         # breakloop_label is used for emitting break statements inside loops.
         while self.look not in ("e", "l", "u", ""):
             match self.look:
-                # case "i":
-                #     self.do_if(breakloop_label)
+                case "i":
+                    self.do_if(breakloop_label)
                 # case "w":
                 #     self.do_while()
                 # case "p":
