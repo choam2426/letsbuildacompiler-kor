@@ -154,12 +154,11 @@ end
 This lets us implement all the different conditional and loop constructs, as
 well as BREAK statements.
 
-Another tricky issue this part demonstrates is stack management. Some of the
-loops (DO and FOR) keep values on TOS across iterations. This needs to be
-carefully managed by the emitted code. We try to follow the original tutorial
-as closely as possible here, including using a local for the loop variable
-in FOR.
-TODO: revisit this with the new structure of loopvars
+Another tricky issue this part demonstrates is local variable management.
+WASM doesn't permit pushing values to the stack outside a block and accessing
+them inside the block. Therefore, for each loop that needs it (like DO and FOR)
+we generate a local to hold the loop variable. For FOR we also generate another
+local that's used for the loop limit.
 
 The original tutorial also has several bugs (like forgetting to emit certain
 expressions and matching TO in FOR loops). I'm fairly certain Jack Crenshaw
@@ -169,8 +168,57 @@ have textual emission tests for sanity checking.
 
 ## Part 6: Boolean Expressions
 
-TODO: note bug in Factor -- should be bool_expression (BNF is correct)
-Mention my skip_white, not doing Fin.
+This part adds boolean expressions (such as '>' comparisons) and integrates
+them into the overall expression parsing structure. The BNF for expressions
+is copied to our Python implementation (the final BNF, which goes through
+a couple of iterations in the original tutorial), and the code is integrated
+into the compiler.
 
-Talk about how testing is done, var decls etc, including tmp0
+This part also unifies expression parsing with the control constructs
+introduced in part 5. All tokens are still limited to a single character,
+but we can now write code that's somewhat reminiscent of real programming:
 
+```
+Y = 3
+X = 0
+w Y > 3
+  X = X + 2
+  Y = Y - 1
+e
+```
+
+For this part, it was important for me to get back to full execution testing
+(using `wasm-tools` and `wasmtime`, like in part 2), since the emitted code
+is becoming increasingly complex and full testing is essential to ensure that
+we're emitting valid code that works.
+
+To this end, I had to add some provisions to the test harness; specifically,
+it declares a few local variables for every program:
+
+```
+(local $X i32)
+(local $Y i32)
+(local $Z i32)
+(local $loopvar1 i32)
+(local $looplimit1 i32)
+```
+
+`$loopvar1` and `$looplimit1` are used for a single emitted FOR loop. `X`,
+`Y` and `Z` are some variable names for the input code to use. I had to hack
+this together in the test harness becase the language our tutorial is handling
+doesn't have any notion of variable declarations yet, and WASM requires us to
+pre-declare locals at the top of the function. I expect this won't be necessary
+in future parts of the tutorial, once variable declarations and procedures are
+covered.
+
+Finally, there are some bugs in the original tutorial our code works aroud;
+for example, the `Factor` procedure in the tutorial should invoke
+`BoolExpression` after `Match('(')`, not `Expression` (the BNF presented by the
+tutorial is actually coorect, but the code isn't).
+
+Also, in the original tutorial `TO` is not matched in the FOR loop (probably
+because it's not single-character), so we omit it too.
+
+Finally, the original tutorial defines `Fin` to separate "statements"
+with newlines. We do this slightly differently, by calling `skip_white` after
+every call to `get_char`; in effect, any whitespace can separate our statements.
