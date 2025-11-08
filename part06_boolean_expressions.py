@@ -284,6 +284,32 @@ class Compiler:
         self.emit_ln("end")  # end block
         self.emit_ln("end")  # end loop
 
+    def do_loop(self):
+        self.match("p")
+        loop_label, breakloop_label = self.generate_loop_labels()
+        self.emit_ln(f"loop {loop_label}")
+        self.emit_ln(f"block {breakloop_label}")
+        self.block(breakloop_label)
+        self.emit_ln(f"br {loop_label}")
+        self.match("e")
+        self.emit_ln("end")  # end block
+        self.emit_ln("end")  # end loop
+
+    def do_repeat(self):
+        self.match("r")
+        loop_label, breakloop_label = self.generate_loop_labels()
+        self.emit_ln(f"loop {loop_label}")
+        self.emit_ln(f"block {breakloop_label}")
+        self.block(breakloop_label)
+        self.match("u")
+        self.bool_expression()
+        # The 'until' condition dictates when to break, so we just branch back
+        # to the loop if the condition is false.
+        self.emit_ln("i32.eqz")
+        self.emit_ln(f"br_if {loop_label}")
+        self.emit_ln("end")  # end block
+        self.emit_ln("end")  # end loop
+
     def block(self, breakloop_label: str = ""):
         # breakloop_label is used for emitting break statements inside loops.
         while self.look not in ("e", "l", "u", ""):
@@ -292,10 +318,10 @@ class Compiler:
                     self.do_if(breakloop_label)
                 case "w":
                     self.do_while()
-                # case "p":
-                #     self.do_loop()
-                # case "r":
-                #     self.do_repeat()
+                case "p":
+                    self.do_loop()
+                case "r":
+                    self.do_repeat()
                 # case "d":
                 #     self.do_do()
                 # case "f":

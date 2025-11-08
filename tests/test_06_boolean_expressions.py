@@ -130,6 +130,36 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 4)
 
+    def test_loop_loop(self):
+        result = self.compile_and_run(
+            r"""
+            Y = 3
+            X = 0
+            p
+                i Y = 0
+                    b
+                e
+                X = X + 2
+                Y = Y - 1
+            e
+        """
+        )
+        self.assertEqual(result, 6)
+
+    def test_repeat_loop(self):
+        result = self.compile_and_run(
+            r"""
+            Y = 3
+            X = 0
+            r
+                X = X + 2
+                Y = Y - 1
+                u Y < 1
+            e
+        """
+        )
+        self.assertEqual(result, 6)
+
 
 class TestCompilerEmittedSource(unittest.TestCase):
     def split_emission(self, output):
