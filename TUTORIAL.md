@@ -222,3 +222,37 @@ because it's not single-character), so we omit it too.
 Finally, the original tutorial defines `Fin` to separate "statements"
 with newlines. We do this slightly differently, by calling `skip_white` after
 every call to `get_char`; in effect, any whitespace can separate our statements.
+
+## Part 7: Lexical Scanning
+
+TODO: the final code in the orig tutorial is buggy? DoIf doesn't "eat" the IF
+token ('i') and calls Block again, which will go to DoIf again?!
+
+More problems: GetNum sets # but it isn't used. ENDIF and END are mapped to
+the same token code 'e'
+
+    const KWlist: array [1..4] of Symbol =
+                  ('IF', 'ELSE', 'ENDIF', 'END');
+
+    const KWcode: string[5] = 'xilee';
+
+    function Lookup(T: TabPtr; s: string; n: integer): integer;
+    var i: integer;
+        found: boolean;
+    begin
+       found := false;
+       i := n;
+       while (i > 0) and not found do
+          if s = T^[i] then
+             found := true
+          else
+             dec(i);
+       Lookup := i;
+    end;
+
+    procedure Scan;
+    begin
+       GetName;
+       Token := KWcode[Lookup(Addr(KWlist), Value, 4) + 1];
+    end;
+              
