@@ -40,12 +40,6 @@ class TokenKind(Enum):
     NUMBER = auto()
     NAME = auto()
 
-    IF = auto()
-    ELSE = auto()
-    END = auto()
-    UNTIL = auto()
-    BREAK = auto()
-
     EOF = auto()
 
 
@@ -66,6 +60,8 @@ _operator_table = {
     ">": TokenKind.GREATER_THAN,
     "<": TokenKind.LESS_THAN,
 }
+
+
 
 
 @dataclass
@@ -134,6 +130,12 @@ class Compiler:
             self.advance_scanner()
         else:
             self.expected(f"'{kind}'")
+
+    def match_name(self, name: str):
+        if self.token.kind == TokenKind.NAME and self.token.value == name:
+            self.advance_scanner()
+        else:
+            self.expected(f"'{name}'")
 
     def emit(self, s: str):
         self.output.write("    " + s)
@@ -303,21 +305,21 @@ class Compiler:
         self.emit_ln(f"local.set ${name}")
 
     def do_if(self, breakloop_label: str = ""):
-        self.match(TokenKind.IF)
+        self.match_name("IF")
         self.bool_expression()
         self.emit_ln("if")
         self.block(breakloop_label)
-        if self.token.kind == TokenKind.ELSE:
-            self.match(TokenKind.ELSE)
+        if self.token.value == "ELSE": # redo with match
+            self.match_name("ELSE")
             self.emit_ln("else")
             self.block(breakloop_label)
-        self.match(TokenKind.END)
+        self.match_name("END")
         self.emit_ln("end")
 
     def do_break(self, breakloop_label: str):
         if breakloop_label == "":
             self.abort("No loop to break from")
-        self.match(TokenKind.BREAK)
+        self.match_name("BREAK")
         self.emit_ln(f"br {breakloop_label}")
 
     # def do_while(self):
@@ -423,14 +425,14 @@ class Compiler:
 
     def block(self, breakloop_label: str = ""):
         # breakloop_label is used for emitting break statements inside loops.
-        while self.token.kind not in (
-            TokenKind.END,
-            TokenKind.ELSE,
-            TokenKind.UNTIL,
-            TokenKind.EOF,
-        ):
-            match self.token.kind:
-                case TokenKind.IF:
+        while self.token.kind != TokenKind.EOF:
+            if self.token.kind != TokenKind.NAME:
+                self.abort("Expected a statement")
+            print('in block, token=', self.token)
+            match self.token.value:
+                case "ELSE" | "END" | "UNTIL":
+                    break
+                case "IF":
                     self.do_if(breakloop_label)
                 # case "w":
                 #     self.do_while()
