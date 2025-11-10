@@ -320,106 +320,20 @@ class Compiler:
         self.advance_scanner()
         self.emit_ln(f"br {breakloop_label}")
 
-    # def do_while(self):
-    #     self.match("w")
-    #     labels = self.generate_loop_labels()
-    #     self.emit_ln(f"loop {labels['loop']}")
-    #     self.emit_ln(f"block {labels['break']}")
-    #     self.bool_expression()
-    #     # For a while loop the break condition is the inverse of the loop
-    #     # condition.
-    #     self.emit_ln("i32.eqz")
-    #     self.emit_ln(f"br_if {labels['break']}")
-    #     self.block(labels["break"])
-    #     self.emit_ln(f"br {labels['loop']}")
-    #     self.match("e")
-    #     self.emit_ln("end")  # end block
-    #     self.emit_ln("end")  # end loop
-
-    # def do_loop(self):
-    #     self.match("p")
-    #     labels = self.generate_loop_labels()
-    #     self.emit_ln(f"loop {labels['loop']}")
-    #     self.emit_ln(f"block {labels['break']}")
-    #     self.block(labels["break"])
-    #     self.emit_ln(f"br {labels['loop']}")
-    #     self.match("e")
-    #     self.emit_ln("end")  # end block
-    #     self.emit_ln("end")  # end loop
-
-    # def do_repeat(self):
-    #     self.match("r")
-    #     labels = self.generate_loop_labels()
-    #     self.emit_ln(f"loop {labels['loop']}")
-    #     self.emit_ln(f"block {labels['break']}")
-    #     self.block(labels["break"])
-    #     self.match("u")
-    #     self.bool_expression()
-    #     # The 'until' condition dictates when to break, so we just branch back
-    #     # to the loop if the condition is false.
-    #     self.emit_ln("i32.eqz")
-    #     self.emit_ln(f"br_if {labels['loop']}")
-    #     self.emit_ln("end")  # end block
-    #     self.emit_ln("end")  # end loop
-
-    # def do_do(self):
-    #     self.match("d")
-    #     self.expression()
-    #     labels = self.generate_loop_labels()
-
-    #     # The loopvar starts with the value of the expression.
-    #     self.emit_ln(f"local.set {labels['var']}")
-    #     self.emit_ln(f"loop {labels['loop']}")
-    #     self.emit_ln(f"block {labels['break']}")
-    #     self.emit_ln(f"local.get {labels['var']}")
-    #     self.emit_ln("i32.const 1")
-    #     self.emit_ln("i32.sub")
-    #     self.emit_ln(f"local.set {labels['var']}")
-    #     self.block(labels["break"])
-    #     self.match("e")
-    #     self.emit_ln(f"local.get {labels['var']}")
-    #     self.emit_ln("i32.const 0")
-    #     self.emit_ln("i32.gt_s")
-    #     self.emit_ln(f"br_if {labels['loop']}")
-    #     self.emit_ln("end")  # end block
-    #     self.emit_ln("end")  # end loop
-
-    # def do_for(self):
-    #     self.match("f")
-    #     labels = self.generate_loop_labels()
-    #     self.get_name()  # loop variable name, ignored here
-    #     self.match("=")
-
-    #     # Loop var starts with initial_value - 1, per the tutorial (because
-    #     # we increment it on each iteration before checking against the limit).
-    #     self.expression()
-    #     self.emit_ln("i32.const 1")
-    #     self.emit_ln("i32.sub")
-    #     self.emit_ln(f"local.set {labels['var']}")
-    #     # NOTE: the original tutorial doesn't match "TO" here, so we won't
-    #     # either.
-
-    #     # Upper limit: compute expression once, save its value in the loop limit
-    #     # variable.
-    #     self.expression()
-    #     self.emit_ln(f"local.set {labels['limit']}")
-    #     self.emit_ln(f"loop {labels['loop']}")
-    #     self.emit_ln(f"block {labels['break']}")
-
-    #     # Fetch the loop variable, increment it and compare to the limit.
-    #     self.emit_ln(f"local.get {labels['var']}")
-    #     self.emit_ln("i32.const 1")
-    #     self.emit_ln("i32.add")
-    #     self.emit_ln(f"local.tee {labels['var']}")
-    #     self.emit_ln(f"local.get {labels['limit']}")
-    #     self.emit_ln("i32.ge_s")
-    #     self.emit_ln(f"br_if {labels['break']}")
-
-    #     self.block(labels["break"])
-    #     self.emit_ln(f"br {labels['loop']}")
-    #     self.match("e")
-    #     self.emit_ln("end")  # end block
-    #     self.emit_ln("end")  # end loop
+    def do_repeat(self):
+        self.advance_scanner()
+        labels = self.generate_loop_labels()
+        self.emit_ln(f"loop {labels['loop']}")
+        self.emit_ln(f"block {labels['break']}")
+        self.block(labels["break"])
+        self.match_name("UNTIL")
+        self.bool_expression()
+        # The 'until' condition dictates when to break, so we just branch back
+        # to the loop if the condition is false.
+        self.emit_ln("i32.eqz")
+        self.emit_ln(f"br_if {labels['loop']}")
+        self.emit_ln("end")  # end block
+        self.emit_ln("end")  # end loop
 
     def block(self, breakloop_label: str = ""):
         # breakloop_label is used for emitting break statements inside loops.
@@ -431,17 +345,9 @@ class Compiler:
                     break
                 case "IF":
                     self.do_if(breakloop_label)
-                # case "w":
-                #     self.do_while()
-                # case "p":
-                #     self.do_loop()
-                # case "r":
-                #     self.do_repeat()
-                # case "d":
-                #     self.do_do()
-                # case "f":
-                #     self.do_for()
-                # case "b":
-                #     self.do_break(breakloop_label)
+                case "REPEAT":
+                    self.do_repeat()
+                case "BREAK":
+                    self.do_break(breakloop_label)
                 case _:
                     self.assignment()
