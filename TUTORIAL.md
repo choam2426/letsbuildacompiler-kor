@@ -228,7 +228,8 @@ every call to `get_char`; in effect, any whitespace can separate our statements.
 TODO: the final code in the orig tutorial is buggy? DoIf doesn't "eat" the IF
 token ('i') and calls Block again, which will go to DoIf again?!
 
-More problems: GetNum sets # but it isn't used. ENDIF and END are mapped to
+More problems: GetNum sets # but it isn't used (and conflicts with not-equal #).
+ENDIF and END are mapped to
 the same token code 'e'
 
     const KWlist: array [1..4] of Symbol =
