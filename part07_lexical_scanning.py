@@ -20,6 +20,8 @@ import sys
 # <relation>        ::= <expression> [<relop> <expression>]
 
 
+# In our scanner, all keywords map to TokenKind.NAME with value equal to
+# the keyword string.
 class TokenKind(Enum):
     ADD = auto()
     SUB = auto()
@@ -33,7 +35,6 @@ class TokenKind(Enum):
     NOT_EQUAL = auto()
     GREATER_THAN = auto()
     LESS_THAN = auto()
-
     LPAREN = auto()
     RPAREN = auto()
 
@@ -62,8 +63,6 @@ _operator_table = {
 }
 
 
-
-
 @dataclass
 class Token:
     kind: TokenKind
@@ -74,12 +73,13 @@ class Compiler:
     def __init__(self, src: str, output: TextIO = sys.stdout):
         self.src = src
         self.pos = 0
+
+        # Current token.
         self.token = None
         self.output = output
         self.loopcount = 0
 
         self.advance_scanner()
-        print('Initialized scanner, first token:', self.token)
 
     def cur_char(self) -> str:
         if self.pos < len(self.src):
@@ -125,11 +125,16 @@ class Compiler:
         while self.cur_char().isspace():
             self.pos += 1
 
-    def match(self, kind: TokenKind):
-        if self.token.kind == kind:
-            self.advance_scanner()
-        else:
+    def match(self, kind: TokenKind) -> str:
+        """Matches the current token's kind and returns its value.
+
+        Advances to the next token if matched; otherwise, aborts.
+        """
+        if self.token.kind != kind:
             self.expected(f"'{kind}'")
+        value = self.token.value
+        self.advance_scanner()
+        return value
 
     def match_name(self, name: str):
         if self.token.kind == TokenKind.NAME and self.token.value == name:
@@ -153,10 +158,9 @@ class Compiler:
         }
 
     def ident(self):
-        name = self.token.value
-        self.match(TokenKind.NAME) # TODO: make match return for convenience
+        name = self.match(TokenKind.NAME)
         if self.token.kind == TokenKind.LPAREN:
-            self.match(TokenKind.LPAREN)
+            self.advance_scanner()
             self.match(TokenKind.RPAREN)
             self.emit_ln(f"call ${name}")
         else:
@@ -164,10 +168,10 @@ class Compiler:
 
     def signed_factor(self):
         if self.token.kind == TokenKind.ADD:
-            self.match(TokenKind.ADD)
+            self.advance_scanner()
             self.factor()
         elif self.token.kind == TokenKind.SUB:
-            self.match(TokenKind.SUB)
+            self.advance_scanner()
             if self.token.kind == TokenKind.NUMBER:
                 self.emit_ln(f"i32.const -{self.token.value}")
             else:
@@ -179,23 +183,22 @@ class Compiler:
 
     def factor(self):
         if self.token.kind == TokenKind.LPAREN:
-            self.match(TokenKind.LPAREN)
+            self.advance_scanner()
             self.bool_expression()
             self.match(TokenKind.RPAREN)
         elif self.token.kind == TokenKind.NAME:
             self.ident()
         else:
-            s = self.token.value
-            self.match(TokenKind.NUMBER)
-            self.emit_ln(f"i32.const {s}")
+            num = self.match(TokenKind.NUMBER)
+            self.emit_ln(f"i32.const {num}")
 
     def multiply(self):
-        self.match(TokenKind.MUL)
+        self.advance_scanner()
         self.factor()
         self.emit_ln("i32.mul")
 
     def divide(self):
-        self.match(TokenKind.DIV)
+        self.advance_scanner()
         self.factor()
         self.emit_ln("i32.div_s")
 
@@ -208,17 +211,16 @@ class Compiler:
                 self.divide()
 
     def add(self):
-        self.match(TokenKind.ADD)
+        self.advance_scanner()
         self.term()
         self.emit_ln("i32.add")
 
     def subtract(self):
-        self.match(TokenKind.SUB)
+        self.advance_scanner()
         self.term()
         self.emit_ln("i32.sub")
 
     def expression(self):
-        print('in expression, token=', self.token)
         self.term()
         while self.token.kind in (TokenKind.ADD, TokenKind.SUB):
             if self.token.kind == TokenKind.ADD:
@@ -227,12 +229,12 @@ class Compiler:
                 self.subtract()
 
     def bool_or(self):
-        self.match(TokenKind.OR)
+        self.advance_scanner()
         self.bool_term()
         self.emit_ln("i32.or")
 
     def bool_xor(self):
-        self.match(TokenKind.XOR)
+        self.advance_scanner()
         self.bool_term()
         self.emit_ln("i32.xor")
 
@@ -247,13 +249,13 @@ class Compiler:
     def bool_term(self):
         self.not_factor()
         while self.token.kind == TokenKind.AND:
-            self.match(TokenKind.AND)
+            self.advance_scanner()
             self.not_factor()
             self.emit_ln("i32.and")
 
     def not_factor(self):
         if self.token.kind == TokenKind.NOT:
-            self.match(TokenKind.NOT)
+            self.advance_scanner()
             self.bool_factor()
             self.emit_ln("i32.eqz")
         else:
@@ -263,22 +265,22 @@ class Compiler:
         self.relation()
 
     def equals(self):
-        self.match(TokenKind.EQUAL)
+        self.advance_scanner()
         self.expression()
         self.emit_ln("i32.eq")
 
     def not_equals(self):
-        self.match(TokenKind.NOT_EQUAL)
+        self.advance_scanner()
         self.expression()
         self.emit_ln("i32.ne")
 
     def less_than(self):
-        self.match(TokenKind.LESS_THAN)
+        self.advance_scanner()
         self.expression()
         self.emit_ln("i32.lt_s")
 
     def greater_than(self):
-        self.match(TokenKind.GREATER_THAN)
+        self.advance_scanner()
         self.expression()
         self.emit_ln("i32.gt_s")
 
@@ -295,22 +297,18 @@ class Compiler:
                 self.greater_than()
 
     def assignment(self):
-        name = self.token.value
-        print('in assignment, token=', self.token)
-        self.match(TokenKind.NAME)
-        print('after matching name, token=', self.token)
+        name = self.match(TokenKind.NAME)
         self.match(TokenKind.EQUAL)
-        print('after matching equal, token=', self.token)
         self.bool_expression()
         self.emit_ln(f"local.set ${name}")
 
     def do_if(self, breakloop_label: str = ""):
-        self.match_name("IF")
+        self.advance_scanner()
         self.bool_expression()
         self.emit_ln("if")
         self.block(breakloop_label)
-        if self.token.value == "ELSE": # redo with match
-            self.match_name("ELSE")
+        if self.token.kind == TokenKind.NAME and self.token.value == "ELSE":
+            self.advance_scanner()
             self.emit_ln("else")
             self.block(breakloop_label)
         self.match_name("END")
@@ -319,7 +317,7 @@ class Compiler:
     def do_break(self, breakloop_label: str):
         if breakloop_label == "":
             self.abort("No loop to break from")
-        self.match_name("BREAK")
+        self.advance_scanner()
         self.emit_ln(f"br {breakloop_label}")
 
     # def do_while(self):
@@ -428,7 +426,6 @@ class Compiler:
         while self.token.kind != TokenKind.EOF:
             if self.token.kind != TokenKind.NAME:
                 self.abort("Expected a statement")
-            print('in block, token=', self.token)
             match self.token.value:
                 case "ELSE" | "END" | "UNTIL":
                     break
