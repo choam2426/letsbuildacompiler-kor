@@ -17,10 +17,29 @@ class TestCompilerEmittedSource(unittest.TestCase):
 
     def test_program(self):
         output = io.StringIO()
-        compiler = Compiler("pA.", output=output)
+        compiler = Compiler("pxbe.", output=output)
         compiler.prog()
 
-        print(self.split_emission(output))
+        self.assertEqual(
+            self.split_emission(output),
+            [
+                "; Module X",
+                "(module",
+                ")"
+            ],
+        )
+
+    def test_programs_parse_properly(self):
+        compiler = Compiler("pxbe.", output=io.StringIO())
+        compiler.prog()
+
+        compiler = Compiler("pxlctpffpbe.", output=io.StringIO())
+        compiler.prog()
+
+    def test_program_fail_parse_without_dot(self):
+        compiler = Compiler("pxbe", output=io.StringIO())
+        with self.assertRaisesRegex(Exception, "' expected"):
+            compiler.prog()
 
 
 if __name__ == "__main__":

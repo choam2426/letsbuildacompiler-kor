@@ -56,5 +56,51 @@ class Compiler:
         self.match("p")
         name = self.get_name()
         self.prolog(name)
+        self.do_block(name)
         self.match(".")
         self.epilog()
+
+    def do_block(self, name: str):
+        self.declarations()
+        self.statements()
+
+    def declarations(self):
+        while self.look in {"l", "c", "t", "v", "p", "f"}:
+            match self.look:
+                case "l":
+                    self.labels()
+                case "c":
+                    self.constants()
+                case "t":
+                    self.types()
+                case "v":
+                    self.variables()
+                case "p":
+                    self.do_procedure()
+                case "f":
+                    self.do_function()
+
+    def statements(self):
+        self.match('b')
+        while self.look != "e":
+            self.get_char()
+        self.match('e')
+
+    def labels(self):
+        self.match("l")
+
+    def constants(self):
+        self.match("c")
+
+    def types(self):
+        self.match("t")
+
+    def variables(self):
+        self.match("v")
+
+    def do_procedure(self):
+        self.match("p")
+
+    def do_function(self):
+        self.match("f")
+
