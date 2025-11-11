@@ -286,3 +286,33 @@ of character-based.
 ## Part 8: A Little Philosophy
 
 No code in this part of the original tutorial.
+
+## Part 9: A Top View
+
+This part demonstartes how to approach building a compiler for an entire
+language using the same approach taken in previous parts. It's back to
+single-character tokens, and mostly creates scaffolding functions that call each
+other in the proper nesting structure.
+
+Our version implements the simplified Pascal parsing as described; it doesn't
+actually *do* anything, but it's a good exercise to show how recursive-descent
+parsers are planned from top-down.
+
+It does address one important topic neglected in previous parts: creating
+a complete output structure with a prolog and epilog. In our case, these
+are simply the WASM module block:
+
+```python
+def prolog(self, name: str):
+    self.emit_ln(f"; Module {name}")
+    self.emit_ln("(module")
+
+def epilog(self):
+    self.emit_ln(")")
+```
+
+Previously, we had to do this in the test harness because there was no natural
+place in the parser (which was focusing on small snippets of code, like
+individual expressions or sequences of statements). In this part, we finally get
+to see a top-level `prog` method responsible for compiling the entire program,
+so it's a natural place to include the prolog + epilog calls.

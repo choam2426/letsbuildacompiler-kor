@@ -22,11 +22,7 @@ class TestCompilerEmittedSource(unittest.TestCase):
 
         self.assertEqual(
             self.split_emission(output),
-            [
-                "; Module X",
-                "(module",
-                ")"
-            ],
+            ["; Module X", "(module", ")"],
         )
 
     def test_programs_parse_properly(self):

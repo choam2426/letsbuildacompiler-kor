@@ -8,8 +8,6 @@ class Compiler:
         self.pos = 0
         self.look = ""
         self.output = output
-
-        # 'Init' from the tutorial: prime the parser by calling get_char.
         self.get_char()
 
     def get_char(self):
@@ -44,7 +42,6 @@ class Compiler:
     def emit_ln(self, s: str):
         self.emit(s + "\n")
 
-    # TODO: talk abuot these
     def prolog(self, name: str):
         self.emit_ln(f"; Module {name}")
         self.emit_ln("(module")
@@ -81,10 +78,10 @@ class Compiler:
                     self.do_function()
 
     def statements(self):
-        self.match('b')
+        self.match("b")
         while self.look != "e":
             self.get_char()
-        self.match('e')
+        self.match("e")
 
     def labels(self):
         self.match("l")
@@ -103,4 +100,3 @@ class Compiler:
 
     def do_function(self):
         self.match("f")
-
