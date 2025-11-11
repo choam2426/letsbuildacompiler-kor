@@ -52,7 +52,7 @@ to an expected value.
 
 This part extends the compiler to properly handle whitespace and support
 multi-digit numbers and multi-character variable names. The compiler it
-constructs is somewhat incomplete, however, since it only hanldes a single
+constructs is somewhat incomplete, however, since it only handles a single
 assignment statement which has no side effects. It also supports function
 calls (with no arguments), but these are emitted without linkage to any actual
 function. All of this is left for later.
@@ -205,16 +205,16 @@ it declares a few local variables for every program:
 
 `$loopvar1` and `$looplimit1` are used for a single emitted FOR loop. `X`,
 `Y` and `Z` are some variable names for the input code to use. I had to hack
-this together in the test harness becase the language our tutorial is handling
+this together in the test harness because the language our tutorial is handling
 doesn't have any notion of variable declarations yet, and WASM requires us to
 pre-declare locals at the top of the function. I expect this won't be necessary
 in future parts of the tutorial, once variable declarations and procedures are
 covered.
 
-Finally, there are some bugs in the original tutorial our code works aroud;
+Finally, there are some bugs in the original tutorial our code works around;
 for example, the `Factor` procedure in the tutorial should invoke
 `BoolExpression` after `Match('(')`, not `Expression` (the BNF presented by the
-tutorial is actually coorect, but the code isn't).
+tutorial is actually correct, but the code isn't).
 
 Also, in the original tutorial `TO` is not matched in the FOR loop (probably
 because it's not single-character), so we omit it too.
@@ -225,35 +225,56 @@ every call to `get_char`; in effect, any whitespace can separate our statements.
 
 ## Part 7: Lexical Scanning
 
-TODO: the final code in the orig tutorial is buggy? DoIf doesn't "eat" the IF
-token ('i') and calls Block again, which will go to DoIf again?!
+This part of the original tutorial went back and forth about representing
+tokens, and the final code is using single characters. I oped for the more
+traditional enum-based approach (also described in the original tutorial). IMHO
+single character token kinds aren't particularly readable (especially if they
+are duplicated -- in the original tutorial 'e' represents both END and ENDIF).
 
-More problems: GetNum sets # but it isn't used (and conflicts with not-equal #).
-ENDIF and END are mapped to
-the same token code 'e'
+Also, Pascal's lack of built-in hash tables makes for a fairly convoluted
+and inefficient lookup of keywords -- the `Lookup` function performs a linear
+scan every time it's invoked.
 
-    const KWlist: array [1..4] of Symbol =
-                  ('IF', 'ELSE', 'ENDIF', 'END');
+In our Python implementation, tokens are represented as:
 
-    const KWcode: string[5] = 'xilee';
 
-    function Lookup(T: TabPtr; s: string; n: integer): integer;
-    var i: integer;
-        found: boolean;
-    begin
-       found := false;
-       i := n;
-       while (i > 0) and not found do
-          if s = T^[i] then
-             found := true
-          else
-             dec(i);
-       Lookup := i;
-    end;
+```python
+@dataclass
+class Token:
+    kind: TokenKind
+    value: str
 
-    procedure Scan;
-    begin
-       GetName;
-       Token := KWcode[Lookup(Addr(KWlist), Value, 4) + 1];
-    end;
-              
+class TokenKind(Enum):
+    ADD = auto()
+    SUB = auto()
+    MUL = auto()
+    DIV = auto()
+    # ... more kinds
+```
+
+There's a single method to scan the next token - `advance_scanner`; it also
+takes care of skipping all whitespace between tokens. And just like in the
+original tutorial, the parsing code doesn't change much, except:
+
+* Using `advance_scanner` instead of `get_char`
+* Matching on `self.token.kind` instead of `self.look` to figure out what
+  kind of token the parser is looking at
+
+The code in the original tutorial has a number of issues we were careful not
+to step on:
+
+* `DoIf` doesn't consume the IF token ('i') and calls `Block`, which will
+  just see the same token and invoke `DoIf` again - this will probably get into
+  an infinite recursion. Our `do_if` calls `self.advance_scanner` right at
+  the start to consume the IF token.
+* `GetNum` uses '#' for "number", but this isn't used anywhere; moreover, it
+  conflicts with the "not equal" operator which is also '#'. In our code,
+  numbers are represented by the `NUMBER` token kind (see `advance_scanner`
+  for how they're scanned).
+
+Our code for this part implements the entire language covered so far except a
+few of the loop kinds (to avoid too much code); IF statements, assignments, all
+expressions (boolean and arithmetic) and REPEAT...UNTIL loops are supported.
+Adding support for additional loop kinds should be trivial - copy the
+appropriate `do_...` method from Part 6 and adjust it to be token-based instead
+of character-based.
