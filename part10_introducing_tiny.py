@@ -9,6 +9,7 @@ class Compiler:
         self.look = ""
         self.output = output
         self.get_char()
+        self.skip_white()
 
     def get_char(self):
         if self.pos < len(self.src):
@@ -34,7 +35,22 @@ class Compiler:
             self.expected("Name")
         name = self.look.upper()
         self.get_char()
+        self.skip_white()
         return name
+
+    def get_num(self) -> str:
+        if not self.look.isdigit():
+            self.expected("Integer")
+        num = ""
+        while self.look.isdigit():
+            num += self.look
+            self.get_char()
+        self.skip_white()
+        return num
+
+    def skip_white(self):
+        while self.look.isspace():
+            self.get_char()
 
     def emit(self, s: str):
         self.output.write("    " + s)
@@ -51,7 +67,15 @@ class Compiler:
 
     def alloc_global(self, name: str):
         # TODO: handle indentation levels properly?
-        self.emit_ln(f"(global ${name} (mut i32) (i32.const 0))")
+        value = "0"
+        if self.look == '=':
+            self.match('=')
+            if self.look == '-':
+                self.match('-')
+                value = '-' + self.get_num()
+            else:
+                value = self.get_num()
+        self.emit_ln(f"(global ${name} (mut i32) (i32.const {value}))")
 
     def prog(self):
         self.match("p")
@@ -76,9 +100,11 @@ class Compiler:
                 case _:
                     self.abort(f"unrecognized keyword {self.look}")
 
+    # <var-list> ::= <var> (, <var> )*
+    # <var> ::= <ident> [ = <num> ]
     def decl(self):
         self.match('v')
-        self.alloc_global(self.look)
-        self.get_char()
-    
-            
+        self.alloc_global(self.get_name())
+        while self.look == ',':
+            self.match(',')
+            self.alloc_global(self.get_name())

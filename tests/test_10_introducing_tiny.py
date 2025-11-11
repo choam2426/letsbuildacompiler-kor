@@ -17,7 +17,7 @@ class TestCompilerEmittedSource(unittest.TestCase):
 
     def test_program(self):
         output = io.StringIO()
-        compiler = Compiler("pvxvyvzbe.", output=output)
+        compiler = Compiler("pvxvy=-91,t,rvzbe.", output=output)
         compiler.prog()
 
         print(self.split_emission(output))
