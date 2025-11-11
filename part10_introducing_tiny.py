@@ -49,10 +49,36 @@ class Compiler:
     def epilog(self):
         self.emit_ln(")")
 
+    def alloc_global(self, name: str):
+        # TODO: handle indentation levels properly?
+        self.emit_ln(f"(global ${name} (mut i32) (i32.const 0))")
+
     def prog(self):
         self.match("p")
+        self.prolog('main')
         # TODO: need header, or not??
-        self.prolog()
+        self.top_decls()
+        self.main()
         self.match(".")
         self.epilog()
 
+    def main(self):
+        self.match('b')
+        self.match('e')
+    
+    # <top-level decls> ::= ( <data declaration> )*
+    # <data declaration> ::= 'v' <var-list>
+    def top_decls(self):
+        while self.look != 'b':
+            match self.look:
+                case 'v':
+                    self.decl()
+                case _:
+                    self.abort(f"unrecognized keyword {self.look}")
+
+    def decl(self):
+        self.match('v')
+        self.alloc_global(self.look)
+        self.get_char()
+    
+            
