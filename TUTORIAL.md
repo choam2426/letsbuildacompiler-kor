@@ -237,7 +237,6 @@ scan every time it's invoked.
 
 In our Python implementation, tokens are represented as:
 
-
 ```python
 @dataclass
 class Token:
@@ -260,8 +259,13 @@ original tutorial, the parsing code doesn't change much, except:
 * Matching on `self.token.kind` instead of `self.look` to figure out what
   kind of token the parser is looking at
 
+Another design decision in our code is representing keywords as just `NAME`
+tokens, without dedicated tokens for each one. While this makes matching them
+very slightly more verbose, it also enables using them in places where keywords
+are not expected (such as variables), similarly to the original tutorial.
+
 The code in the original tutorial has a number of issues we were careful not
-to step on:
+to replicate:
 
 * `DoIf` doesn't consume the IF token ('i') and calls `Block`, which will
   just see the same token and invoke `DoIf` again - this will probably get into
@@ -278,3 +282,7 @@ expressions (boolean and arithmetic) and REPEAT...UNTIL loops are supported.
 Adding support for additional loop kinds should be trivial - copy the
 appropriate `do_...` method from Part 6 and adjust it to be token-based instead
 of character-based.
+
+## Part 8: A Little Philosophy
+
+No code in this part of the original tutorial.
