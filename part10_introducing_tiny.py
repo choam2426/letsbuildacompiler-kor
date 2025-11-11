@@ -8,6 +8,10 @@ class Compiler:
         self.pos = 0
         self.look = ""
         self.output = output
+
+        # Used only to avoid duplicate declarations for now.
+        self.symtable = set()
+
         self.get_char()
         self.skip_white()
 
@@ -66,6 +70,9 @@ class Compiler:
         self.emit_ln(")")
 
     def alloc_global(self, name: str):
+        if name in self.symtable:
+            self.abort(f"Duplicate global variable {name}")
+        self.symtable.add(name)
         # TODO: handle indentation levels properly?
         value = "0"
         if self.look == '=':
@@ -77,6 +84,9 @@ class Compiler:
                 value = self.get_num()
         self.emit_ln(f"(global ${name} (mut i32) (i32.const {value}))")
 
+    def undefined(self, name: str):
+        self.abort(f"Undefined identifier {name}")
+
     def prog(self):
         self.match("p")
         self.prolog('main')
@@ -86,8 +96,10 @@ class Compiler:
         self.match(".")
         self.epilog()
 
+    # <main> ::= 'b' <block> 'e'
     def main(self):
         self.match('b')
+        self.block()
         self.match('e')
     
     # <top-level decls> ::= ( <data declaration> )*
@@ -108,3 +120,60 @@ class Compiler:
         while self.look == ',':
             self.match(',')
             self.alloc_global(self.get_name())
+
+    # <block> ::= ( <assignment> )*    
+    def block(self):
+        while self.look != 'e':
+            self.assignment()
+
+    # <assignment> ::= <ident> '=' <expression>
+    # <expression> ::= <first term> ( <addop> <term> )*
+    # <term> ::= <factor> ( <mulop> <factor> )*
+    # <first term> ::= <first factor> ( <mulop> <factor> )*
+    # <first factor> ::= [ <addop> ] <factor>
+    # <factor> ::= <var> | <number> | ( <expression> )
+    def assignment(self):
+        self.get_char()
+
+    def factor(self):
+        if self.look == "(":
+            self.match("(")
+            self.expression()
+            self.match(")")
+        elif self.look.isalpha():
+            name = self.get_name()
+            if name not in self.symtable:
+                self.undefined(name)
+            self.emit_ln(f"global.get ${name}")
+        else:
+            self.emit_ln(f"i32.const {self.get_num()}")
+    
+    def neg_factor(self):
+        self.mathc('-')
+        if self.look.isdigit():
+            self.emit_ln(f"i32.const -{self.get_num()}")
+        else:
+            self.factor()
+            self.emit_ln("i32.const -1")
+            self.emit_ln("i32.mul")
+    
+    def first_factor(self):
+        match self.look:
+            case '+':
+                self.match('+')
+                self.factor()
+            case '-':
+                self.neg_factor()
+            case _:
+                self.factor()
+
+    def multiply(self):
+        self.match("*")
+        self.factor()
+        self.emit_ln("i32.mul")
+
+    def divide(self):
+        self.match("/")
+        self.factor()
+        self.emit_ln("i32.div_s")
+        
