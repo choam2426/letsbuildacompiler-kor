@@ -8,7 +8,7 @@ class TestCompileAndExecute(unittest.TestCase):
     def compile_and_run(self, src: str, show=False) -> int:
         output = io.StringIO()
         compiler = Compiler(src, output=output)
-        compiler.block()
+        compiler.prog()
         full_code = output.getvalue()
 
         if show:
@@ -28,18 +28,13 @@ class TestCompileAndExecute(unittest.TestCase):
             text = str(output)
         return [line.strip() for line in text.splitlines() if line.strip()]
 
-    def test_program(self):
+    def test_basic_assign(self):
         output = io.StringIO()
-        compiler = Compiler("pvx,y=5bx=y+5e.", output=output)
-        compiler.prog()
+        result = self.compile_and_run("p vx,y=5 b x=y+7 e.")
+        self.assertEqual(result, 12)
 
-        print(output.getvalue())
-        # print(self.split_emission(output))
-        # self.assertEqual(
-        #     self.split_emission(output),
-        #     ["; Module X", "(module", ")"],
-        # )
-
+        result = self.compile_and_run("p vx=6,y=5 b x=y+7+x e.")
+        self.assertEqual(result, 18)
 
 if __name__ == "__main__":
     unittest.main()

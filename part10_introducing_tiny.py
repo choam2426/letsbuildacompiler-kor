@@ -31,6 +31,7 @@ class Compiler:
     def match(self, x: str):
         if self.look == x:
             self.get_char()
+            self.skip_white()
         else:
             self.expected(f"'{x}'")
 
@@ -111,7 +112,7 @@ class Compiler:
                 case "v":
                     self.decl()
                 case _:
-                    self.abort(f"unrecognized keyword {self.look}")
+                    self.abort(f"unrecognized keyword '{self.look}'")
 
     # <var-list> ::= <var> (, <var> )*
     # <var> ::= <ident> [ = <num> ]
