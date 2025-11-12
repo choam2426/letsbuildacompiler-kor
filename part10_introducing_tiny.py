@@ -8,6 +8,7 @@ class Compiler:
         self.pos = 0
         self.look = ""
         self.output = output
+        self.indent = 0
 
         # Used only to avoid duplicate declarations for now.
         self.symtable = set()
@@ -57,11 +58,8 @@ class Compiler:
         while self.look.isspace():
             self.get_char()
 
-    def emit(self, s: str):
-        self.output.write("    " + s)
-
     def emit_ln(self, s: str):
-        self.emit(s + "\n")
+        self.output.write(" " * self.indent + s + "\n")
 
     def prolog(self):
         self.emit_ln("(module")
@@ -73,7 +71,6 @@ class Compiler:
         if name in self.symtable:
             self.abort(f"Duplicate global variable {name}")
         self.symtable.add(name)
-        # TODO: handle indentation levels properly?
         value = "0"
         if self.look == "=":
             self.match("=")
@@ -90,17 +87,21 @@ class Compiler:
     def prog(self):
         self.match("p")
         self.prolog()
+        self.indent += 4
         self.top_decls()
         self.main()
         self.match(".")
+        self.indent -= 4
         self.epilog()
 
     # <main> ::= 'b' <block> 'e'
     def main(self):
         self.match("b")
         self.emit_ln('(func $main (export "main") (result i32)')
+        self.indent += 4
         self.block()
         self.emit_ln("global.get $X")
+        self.indent -= 4
         self.emit_ln(")")
         self.match("e")
 
