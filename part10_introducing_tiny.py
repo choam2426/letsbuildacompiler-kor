@@ -9,6 +9,7 @@ class Compiler:
         self.look = ""
         self.output = output
         self.indent = 0
+        self.loopcount = 0
 
         # Used only to avoid duplicate declarations for now.
         self.symtable = set()
@@ -35,6 +36,13 @@ class Compiler:
             self.skip_white()
         else:
             self.expected(f"'{x}'")
+
+    def generate_loop_labels(self) -> dict[str, str]:
+        self.loopcount += 1
+        return {
+            "loop": f"$loop{self.loopcount}",
+            "break": f"$breakloop{self.loopcount}",
+        }
 
     def get_name(self) -> str:
         if not self.look.isalpha():
@@ -87,21 +95,21 @@ class Compiler:
     def prog(self):
         self.match("p")
         self.prolog()
-        self.indent += 4
+        self.indent += 2
         self.top_decls()
         self.main()
         self.match(".")
-        self.indent -= 4
+        self.indent -= 2
         self.epilog()
 
     # <main> ::= 'b' <block> 'e'
     def main(self):
         self.match("b")
         self.emit_ln('(func $main (export "main") (result i32)')
-        self.indent += 4
+        self.indent += 2
         self.block()
         self.emit_ln("global.get $X")
-        self.indent -= 4
+        self.indent -= 2
         self.emit_ln(")")
         self.match("e")
 
@@ -124,10 +132,22 @@ class Compiler:
             self.match(",")
             self.alloc_global(self.get_name())
 
-    # <block> ::= ( <assignment> )*
-    def block(self):
-        while self.look != "e":
-            self.assignment()
+    # <if> ::= I <bool-expression> <block> [ L <block>] E
+    # <while> ::= W <bool-expression> <block> E
+    # <block> ::= ( <statement> )*
+    # <statement> ::= <if> | <while> | <assignment>
+    def block(self, breakloop_label: str = ""):
+        # breakloop_label is used for emitting break statements inside loops.
+        while self.look not in ("e", "l", ""):
+            match self.look:
+                case "i":
+                    self.do_if(breakloop_label)
+                case "w":
+                    self.do_while()
+                case "b":
+                    self.do_break(breakloop_label)
+                case _:
+                    self.assignment()
 
     # <assignment> ::= <ident> '=' <bool-expression>
     # <expression> ::= <first term> ( <addop> <term> )*
@@ -290,3 +310,45 @@ class Compiler:
                 self.bool_or()
             elif self.look == "~":
                 self.bool_xor()
+
+    def do_if(self, breakloop_label: str = ""):
+        self.match("i")
+        self.bool_expression()
+        self.emit_ln("if")
+        self.indent += 2
+        self.block(breakloop_label)
+        self.indent -= 2
+        if self.look == "l":
+            self.match("l")
+            self.emit_ln("else")
+            self.indent += 2
+            self.block(breakloop_label)
+            self.indent -= 2
+        self.match("e")
+        self.emit_ln("end")
+
+    def do_break(self, breakloop_label: str):
+        if breakloop_label == "":
+            self.abort("No loop to break from")
+        self.match("b")
+        self.emit_ln(f"br {breakloop_label}")
+
+    def do_while(self):
+        self.match("w")
+        labels = self.generate_loop_labels()
+        self.emit_ln(f"loop {labels['loop']}")
+        self.indent += 2
+        self.emit_ln(f"block {labels['break']}")
+        self.indent += 2
+        self.bool_expression()
+        # For a while loop the break condition is the inverse of the loop
+        # condition.
+        self.emit_ln("i32.eqz")
+        self.emit_ln(f"br_if {labels['break']}")
+        self.block(labels["break"])
+        self.emit_ln(f"br {labels['loop']}")
+        self.match("e")
+        self.indent -= 2
+        self.emit_ln("end")  # end block
+        self.indent -= 2
+        self.emit_ln("end")  # end loop

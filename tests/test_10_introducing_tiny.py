@@ -70,6 +70,70 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 0)
 
+    def test_if_else(self):
+        result = self.compile_and_run(
+            r"""
+        p
+            vx=0,y=10
+        b
+            i x < 5
+                x = 20
+            l
+                x = 30
+            e
+        e.
+        """
+        )
+        self.assertEqual(result, 20)
+
+        result = self.compile_and_run(
+            r"""
+        p
+            vx=0,y=10
+        b
+            i x > 5
+                x = 20
+            l
+                x = 30
+            e
+        e.
+        """
+        )
+        self.assertEqual(result, 30)
+
+    def test_while_loop(self):
+        result = self.compile_and_run(
+            r"""
+        p
+            vx=0,y=5
+        b
+            w y > 0
+                x = x + 2
+                y = y - 1
+            e
+        e.
+        """
+        )
+        self.assertEqual(result, 10)
+
+        # Same but with an early break
+        result = self.compile_and_run(
+            r"""
+        p     
+            vx=0,y=5
+        b
+            w y > 0
+                x = x + 2
+                i x = 6
+                    b
+                e
+                y = y - 1
+            e
+        e.
+        """
+        )
+        self.assertEqual(result, 6)
+
 
 if __name__ == "__main__":
     unittest.main()
