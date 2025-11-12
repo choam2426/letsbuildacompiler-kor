@@ -62,8 +62,7 @@ class Compiler:
     def emit_ln(self, s: str):
         self.emit(s + "\n")
 
-    def prolog(self, name: str):
-        self.emit_ln(f"; Module {name}")
+    def prolog(self):
         self.emit_ln("(module")
 
     def epilog(self):
@@ -75,11 +74,11 @@ class Compiler:
         self.symtable.add(name)
         # TODO: handle indentation levels properly?
         value = "0"
-        if self.look == '=':
-            self.match('=')
-            if self.look == '-':
-                self.match('-')
-                value = '-' + self.get_num()
+        if self.look == "=":
+            self.match("=")
+            if self.look == "-":
+                self.match("-")
+                value = "-" + self.get_num()
             else:
                 value = self.get_num()
         self.emit_ln(f"(global ${name} (mut i32) (i32.const {value}))")
@@ -89,8 +88,7 @@ class Compiler:
 
     def prog(self):
         self.match("p")
-        self.prolog('main')
-        # TODO: need header, or not??
+        self.prolog()
         self.top_decls()
         self.main()
         self.match(".")
@@ -98,16 +96,19 @@ class Compiler:
 
     # <main> ::= 'b' <block> 'e'
     def main(self):
-        self.match('b')
+        self.match("b")
+        self.emit_ln('(func $main (export "main") (result i32)')
         self.block()
-        self.match('e')
-    
+        self.emit_ln("global.get $X")
+        self.emit_ln(")")
+        self.match("e")
+
     # <top-level decls> ::= ( <data declaration> )*
     # <data declaration> ::= 'v' <var-list>
     def top_decls(self):
-        while self.look != 'b':
+        while self.look != "b":
             match self.look:
-                case 'v':
+                case "v":
                     self.decl()
                 case _:
                     self.abort(f"unrecognized keyword {self.look}")
@@ -115,15 +116,15 @@ class Compiler:
     # <var-list> ::= <var> (, <var> )*
     # <var> ::= <ident> [ = <num> ]
     def decl(self):
-        self.match('v')
+        self.match("v")
         self.alloc_global(self.get_name())
-        while self.look == ',':
-            self.match(',')
+        while self.look == ",":
+            self.match(",")
             self.alloc_global(self.get_name())
 
-    # <block> ::= ( <assignment> )*    
+    # <block> ::= ( <assignment> )*
     def block(self):
-        while self.look != 'e':
+        while self.look != "e":
             self.assignment()
 
     # <assignment> ::= <ident> '=' <expression>
@@ -133,7 +134,12 @@ class Compiler:
     # <first factor> ::= [ <addop> ] <factor>
     # <factor> ::= <var> | <number> | ( <expression> )
     def assignment(self):
-        self.get_char()
+        name = self.get_name()
+        if name not in self.symtable:
+            self.undefined(name)
+        self.match("=")
+        self.expression()
+        self.emit_ln(f"global.set ${name}")
 
     def factor(self):
         if self.look == "(":
@@ -147,22 +153,22 @@ class Compiler:
             self.emit_ln(f"global.get ${name}")
         else:
             self.emit_ln(f"i32.const {self.get_num()}")
-    
+
     def neg_factor(self):
-        self.mathc('-')
+        self.match("-")
         if self.look.isdigit():
             self.emit_ln(f"i32.const -{self.get_num()}")
         else:
             self.factor()
             self.emit_ln("i32.const -1")
             self.emit_ln("i32.mul")
-    
+
     def first_factor(self):
         match self.look:
-            case '+':
-                self.match('+')
+            case "+":
+                self.match("+")
                 self.factor()
-            case '-':
+            case "-":
                 self.neg_factor()
             case _:
                 self.factor()
@@ -176,4 +182,37 @@ class Compiler:
         self.match("/")
         self.factor()
         self.emit_ln("i32.div_s")
-        
+
+    def term1(self):
+        # Common code for term and first_term
+        while self.look in ("*", "/"):
+            if self.look == "*":
+                self.multiply()
+            elif self.look == "/":
+                self.divide()
+
+    def term(self):
+        self.factor()
+        self.term1()
+
+    def first_term(self):
+        self.first_factor()
+        self.term1()
+
+    def add(self):
+        self.match("+")
+        self.term()
+        self.emit_ln("i32.add")
+
+    def subtract(self):
+        self.match("-")
+        self.term()
+        self.emit_ln("i32.sub")
+
+    def expression(self):
+        self.first_term()
+        while self.look in ("+", "-"):
+            if self.look == "+":
+                self.add()
+            elif self.look == "-":
+                self.subtract()
