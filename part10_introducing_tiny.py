@@ -129,24 +129,29 @@ class Compiler:
         while self.look != "e":
             self.assignment()
 
-    # <assignment> ::= <ident> '=' <expression>
+    # <assignment> ::= <ident> '=' <bool-expression>
     # <expression> ::= <first term> ( <addop> <term> )*
     # <term> ::= <factor> ( <mulop> <factor> )*
     # <first term> ::= <first factor> ( <mulop> <factor> )*
     # <first factor> ::= [ <addop> ] <factor>
-    # <factor> ::= <var> | <number> | ( <expression> )
+    # <factor> ::= <var> | <number> | ( <bool-expression> )
+
+    # <bool-expression> ::= <bool-term> ( <orop> <bool-term> )*
+    # <bool-term> ::= <not-factor> ( <andop> <not-factor> )*
+    # <not-factor> ::= [ '!' ] <relation>
+    # <relation> ::= <expression> [ <relop> <expression> ]
     def assignment(self):
         name = self.get_name()
         if name not in self.symtable:
             self.undefined(name)
         self.match("=")
-        self.expression()
+        self.bool_expression()
         self.emit_ln(f"global.set ${name}")
 
     def factor(self):
         if self.look == "(":
             self.match("(")
-            self.expression()
+            self.bool_expression()
             self.match(")")
         elif self.look.isalpha():
             name = self.get_name()
@@ -218,3 +223,70 @@ class Compiler:
                 self.add()
             elif self.look == "-":
                 self.subtract()
+
+    def equals(self):
+        self.match("=")
+        self.expression()
+        self.emit_ln("i32.eq")
+
+    def not_equals(self):
+        self.match("#")
+        self.expression()
+        self.emit_ln("i32.ne")
+
+    def less_than(self):
+        self.match("<")
+        self.expression()
+        self.emit_ln("i32.lt_s")
+
+    def greater_than(self):
+        self.match(">")
+        self.expression()
+        self.emit_ln("i32.gt_s")
+
+    def relation(self):
+        self.expression()
+        match self.look:
+            case "=":
+                self.equals()
+            case "#":
+                self.not_equals()
+            case "<":
+                self.less_than()
+            case ">":
+                self.greater_than()
+            case _:
+                pass
+
+    def not_factor(self):
+        if self.look == "!":
+            self.match("!")
+            self.relation()
+            self.emit_ln("i32.eqz")
+        else:
+            self.relation()
+
+    def bool_term(self):
+        self.not_factor()
+        while self.look == "&":
+            self.match("&")
+            self.not_factor()
+            self.emit_ln("i32.and")
+
+    def bool_or(self):
+        self.match("|")
+        self.bool_term()
+        self.emit_ln("i32.or")
+
+    def bool_xor(self):
+        self.match("~")
+        self.bool_term()
+        self.emit_ln("i32.xor")
+
+    def bool_expression(self):
+        self.bool_term()
+        while self.look in ("|", "~"):
+            if self.look == "|":
+                self.bool_or()
+            elif self.look == "~":
+                self.bool_xor()

@@ -16,7 +16,7 @@ class TestCompileAndExecute(unittest.TestCase):
             print(full_code)
             print("-----------------------------")
         return run_wasm(full_code)
-    
+
     def split_emission(self, output):
         """Return compiler emission as a list of non-empty lines.
 
@@ -29,12 +29,47 @@ class TestCompileAndExecute(unittest.TestCase):
         return [line.strip() for line in text.splitlines() if line.strip()]
 
     def test_basic_assign(self):
-        output = io.StringIO()
         result = self.compile_and_run("p vx,y=5 b x=y+7 e.")
         self.assertEqual(result, 12)
 
         result = self.compile_and_run("p vx=6,y=5 b x=y+7+x e.")
         self.assertEqual(result, 18)
+
+    def test_assign_boolean_expr(self):
+        result = self.compile_and_run(
+            """
+        p
+            vx=8,y,z
+        b
+            y = x = 8
+            z = x < 5
+            y = y & !z
+            x = y
+        e.
+        """
+        )
+        self.assertEqual(result, 1)
+
+        result = self.compile_and_run("""
+        p
+            vx=8,y=3,z=2
+        b
+            x = (y + 5 = 8) & (z < 3)
+        e.
+        """)
+        self.assertEqual(result, 1)
+
+        result = self.compile_and_run(
+            """
+        p
+            vx=8,y=4,z=2
+        b
+            x = (y + 5 = 8) & (z < 3)
+        e.
+        """
+        )
+        self.assertEqual(result, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
