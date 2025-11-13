@@ -78,6 +78,38 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 0)
 
+    def test_multichar_operators(self):
+        #         code = r"""
+        #     foo = {fooval}
+        #     X = 0
+        #     if foo < 3
+        #         X = 9
+        #     else
+        #         if foo = 5
+        #             X = 8
+        #         else
+        #             X = 7
+        #         end
+        #     end"""
+        # result = self.compile_and_run(code.format(fooval=2))
+        code = r"""
+        p
+            v x=0,y={yval}
+        b
+            x = y >= 5
+            x = x + (y <= 10)
+            x = x + (y <> 3)
+        e.
+        """
+        result = self.compile_and_run(code.format(yval=5))
+        self.assertEqual(result, 3)
+
+        result = self.compile_and_run(code.format(yval=20))
+        self.assertEqual(result, 2)
+
+        result = self.compile_and_run(code.format(yval=3))
+        self.assertEqual(result, 1)
+
     def test_if_else(self):
         result = self.compile_and_run(
             r"""

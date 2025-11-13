@@ -18,7 +18,9 @@ class TokenKind(Enum):
     EQUAL = auto()
     NOT_EQUAL = auto()
     GREATER_THAN = auto()
+    GREATER_EQUAL = auto()
     LESS_THAN = auto()
+    LESS_EQUAL = auto()
     LPAREN = auto()
     RPAREN = auto()
     DOT = auto()
@@ -43,9 +45,11 @@ _operator_table = {
     "&": TokenKind.AND,
     "!": TokenKind.NOT,
     "=": TokenKind.EQUAL,
-    "#": TokenKind.NOT_EQUAL,
+    "<>": TokenKind.NOT_EQUAL,
     ">": TokenKind.GREATER_THAN,
+    ">=": TokenKind.GREATER_EQUAL,
     "<": TokenKind.LESS_THAN,
+    "<=": TokenKind.LESS_EQUAL,
     ".": TokenKind.DOT,
     ",": TokenKind.COMMA,
 }
@@ -79,15 +83,11 @@ class Compiler:
 
     def advance_scanner(self):
         self.skip_white()
-        if self.pos >= len(self.src):
+        c = self.cur_char()
+        if c == "":
             self.token = Token(TokenKind.EOF, "")
             return
-
-        c = self.cur_char()
-        op = _operator_table.get(c, None)
-        if op is not None:
-            self.token = Token(op, c)
-            self.pos += 1
+        elif self.scan_op(c):
             return
         elif c.isalpha():
             name = ""
@@ -105,6 +105,27 @@ class Compiler:
             return
 
         self.abort(f"Unrecognized character: '{c}'")
+
+    def scan_op(self, c: str) -> bool:
+        """Scans an operator, possibly multi-character.
+
+        If successful, sets self.token and returns True; else returns False.
+        """
+        cc = c
+        if c == ">":
+            self.pos += 1
+            if (nc := self.cur_char()) == "=":
+                cc += nc
+        elif c == "<":
+            self.pos += 1
+            if (nc := self.cur_char()) in ("=", ">"):
+                cc += nc
+        if (op := _operator_table.get(cc, None)) is not None:
+            self.token = Token(op, cc)
+            self.pos += 1
+            return True
+        else:
+            return False
 
     def abort(self, msg: str):
         raise Exception(f"Error: {msg}")
@@ -139,15 +160,6 @@ class Compiler:
             "break": f"$breakloop{self.loopcount}",
         }
 
-    def ident(self):
-        name = self.match(TokenKind.NAME)
-        if self.token.kind == TokenKind.LPAREN:
-            self.advance_scanner()
-            self.match(TokenKind.RPAREN)
-            self.emit_ln(f"call ${name}")
-        else:
-            self.emit_ln(f"global.get ${name}")
-
     def skip_white(self):
         while self.cur_char().isspace():
             self.pos += 1
@@ -177,6 +189,15 @@ class Compiler:
 
     def undefined(self, name: str):
         self.abort(f"Undefined identifier {name}")
+
+    def ident(self):
+        name = self.match(TokenKind.NAME)
+        if self.token.kind == TokenKind.LPAREN:
+            self.advance_scanner()
+            self.match(TokenKind.RPAREN)
+            self.emit_ln(f"call ${name}")
+        else:
+            self.emit_ln(f"global.get ${name}")
 
     def prog(self):
         self.match_name("P")
@@ -225,7 +246,7 @@ class Compiler:
         # breakloop_label is used for emitting break statements inside loops.
         while self.token.kind != TokenKind.EOF:
             if self.token.kind != TokenKind.NAME:
-                self.abort("expected a statement")
+                self.abort(f"expected a statement [got '{self.token.value}']")
             match self.token.value:
                 case "E" | "L":
                     break
@@ -346,10 +367,20 @@ class Compiler:
         self.expression()
         self.emit_ln("i32.lt_s")
 
+    def less_equal(self):
+        self.advance_scanner()
+        self.expression()
+        self.emit_ln("i32.le_s")
+
     def greater_than(self):
         self.advance_scanner()
         self.expression()
         self.emit_ln("i32.gt_s")
+
+    def greater_equal(self):
+        self.advance_scanner()
+        self.expression()
+        self.emit_ln("i32.ge_s")
 
     def relation(self):
         self.expression()
@@ -360,8 +391,12 @@ class Compiler:
                 self.not_equals()
             case TokenKind.LESS_THAN:
                 self.less_than()
+            case TokenKind.LESS_EQUAL:
+                self.less_equal()
             case TokenKind.GREATER_THAN:
                 self.greater_than()
+            case TokenKind.GREATER_EQUAL:
+                self.greater_equal()
             case _:
                 pass
 
