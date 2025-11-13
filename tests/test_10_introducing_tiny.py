@@ -1,21 +1,26 @@
 import io
+from typing import TextIO
 import unittest
-from tests.wasm_util import run_wasm
+from tests.wasm_util import run_wasm_with_io
 from part10_introducing_tiny import Compiler
 
 
 class TestCompileAndExecute(unittest.TestCase):
-    def compile_and_run(self, src: str, show=False) -> int:
+    def _compile_to_wasm(self, src: str, show=False) -> str:
         output = io.StringIO()
         compiler = Compiler(src, output=output)
         compiler.prog()
-        full_code = output.getvalue()
-
         if show:
             print("--------- WASM CODE ---------")
-            print(full_code)
+            print(output.getvalue())
             print("-----------------------------")
-        return run_wasm(full_code)
+        return output.getvalue()
+
+    def compile_and_run_with_io(
+        self, src: str, output: TextIO | None = None, show=False
+    ) -> int:
+        full_code = self._compile_to_wasm(src, show=show)
+        return run_wasm_with_io(full_code, output)
 
     def split_emission(self, output):
         """Return compiler emission as a list of non-empty lines.
@@ -29,20 +34,20 @@ class TestCompileAndExecute(unittest.TestCase):
         return [line.strip() for line in text.splitlines() if line.strip()]
 
     def test_basic_assign(self):
-        result = self.compile_and_run("p v x,y=5 b x=y+7 e.")
+        result = self.compile_and_run_with_io("p v x,y=5 b x=y+7 e.")
         self.assertEqual(result, 12)
 
-        result = self.compile_and_run("p v x=6,y=5 b x=y+7+x e.")
+        result = self.compile_and_run_with_io("p v x=6,y=5 b x=y+7+x e.")
         self.assertEqual(result, 18)
 
     def test_longer_var_names(self):
-        result = self.compile_and_run(
+        result = self.compile_and_run_with_io(
             "p v firstVar=10,secondVar=20, x b x=firstVar+secondVar e."
         )
         self.assertEqual(result, 30)
 
     def test_assign_boolean_expr(self):
-        result = self.compile_and_run(
+        result = self.compile_and_run_with_io(
             """
         p
             v x=8,y,z
@@ -56,7 +61,7 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 1)
 
-        result = self.compile_and_run(
+        result = self.compile_and_run_with_io(
             """
         p
             v x=8,y=3,z=2
@@ -67,7 +72,7 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 1)
 
-        result = self.compile_and_run(
+        result = self.compile_and_run_with_io(
             """
         p
             v x=8,y=4,z=2
@@ -79,19 +84,6 @@ class TestCompileAndExecute(unittest.TestCase):
         self.assertEqual(result, 0)
 
     def test_multichar_operators(self):
-        #         code = r"""
-        #     foo = {fooval}
-        #     X = 0
-        #     if foo < 3
-        #         X = 9
-        #     else
-        #         if foo = 5
-        #             X = 8
-        #         else
-        #             X = 7
-        #         end
-        #     end"""
-        # result = self.compile_and_run(code.format(fooval=2))
         code = r"""
         p
             v x=0,y={yval}
@@ -101,17 +93,17 @@ class TestCompileAndExecute(unittest.TestCase):
             x = x + (y <> 3)
         e.
         """
-        result = self.compile_and_run(code.format(yval=5))
+        result = self.compile_and_run_with_io(code.format(yval=5))
         self.assertEqual(result, 3)
 
-        result = self.compile_and_run(code.format(yval=20))
+        result = self.compile_and_run_with_io(code.format(yval=20))
         self.assertEqual(result, 2)
 
-        result = self.compile_and_run(code.format(yval=3))
+        result = self.compile_and_run_with_io(code.format(yval=3))
         self.assertEqual(result, 1)
 
     def test_if_else(self):
-        result = self.compile_and_run(
+        result = self.compile_and_run_with_io(
             r"""
         p
             v x=0,y=10
@@ -126,7 +118,7 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 20)
 
-        result = self.compile_and_run(
+        result = self.compile_and_run_with_io(
             r"""
         p
             v x=0,y=10
@@ -142,7 +134,7 @@ class TestCompileAndExecute(unittest.TestCase):
         self.assertEqual(result, 30)
 
     def test_while_loop(self):
-        result = self.compile_and_run(
+        result = self.compile_and_run_with_io(
             r"""
         p
             v x=0,y=5
@@ -157,7 +149,7 @@ class TestCompileAndExecute(unittest.TestCase):
         self.assertEqual(result, 10)
 
         # Same but with an early break
-        result = self.compile_and_run(
+        result = self.compile_and_run_with_io(
             r"""
         p     
             v x=0,y=5

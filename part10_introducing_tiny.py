@@ -169,6 +169,7 @@ class Compiler:
 
     def prolog(self):
         self.emit_ln("(module")
+        self.emit_ln('  (func $write_i32 (import "" "write_i32") (param i32))')
 
     def epilog(self):
         self.emit_ln(")")
