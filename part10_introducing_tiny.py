@@ -1,12 +1,68 @@
+from enum import Enum, auto
+from dataclasses import dataclass
 from typing import TextIO
 import sys
+
+
+# In our scanner, all keywords map to TokenKind.NAME with value equal to
+# the keyword string.
+class TokenKind(Enum):
+    ADD = auto()
+    SUB = auto()
+    MUL = auto()
+    DIV = auto()
+    OR = auto()
+    XOR = auto()
+    AND = auto()
+    NOT = auto()
+    EQUAL = auto()
+    NOT_EQUAL = auto()
+    GREATER_THAN = auto()
+    LESS_THAN = auto()
+    LPAREN = auto()
+    RPAREN = auto()
+    DOT = auto()
+    COMMA = auto()
+
+    NUMBER = auto()
+    NAME = auto()
+
+    EOF = auto()
+
+
+# Maps operators to tokens
+_operator_table = {
+    "+": TokenKind.ADD,
+    "-": TokenKind.SUB,
+    "*": TokenKind.MUL,
+    "/": TokenKind.DIV,
+    "(": TokenKind.LPAREN,
+    ")": TokenKind.RPAREN,
+    "|": TokenKind.OR,
+    "~": TokenKind.XOR,
+    "&": TokenKind.AND,
+    "!": TokenKind.NOT,
+    "=": TokenKind.EQUAL,
+    "#": TokenKind.NOT_EQUAL,
+    ">": TokenKind.GREATER_THAN,
+    "<": TokenKind.LESS_THAN,
+    ".": TokenKind.DOT,
+    ",": TokenKind.COMMA,
+}
+
+
+@dataclass
+class Token:
+    kind: TokenKind
+    value: str
 
 
 class Compiler:
     def __init__(self, src: str, output: TextIO = sys.stdout):
         self.src = src
         self.pos = 0
-        self.look = ""
+
+        self.token = None
         self.output = output
         self.indent = 0
         self.loopcount = 0
@@ -14,28 +70,67 @@ class Compiler:
         # Used only to avoid duplicate declarations for now.
         self.symtable = set()
 
-        self.get_char()
-        self.skip_white()
+        self.advance_scanner()
 
-    def get_char(self):
+    def cur_char(self) -> str:
         if self.pos < len(self.src):
-            self.look = self.src[self.pos]
+            return self.src[self.pos]
+        return ""  # End of input
+
+    def advance_scanner(self):
+        self.skip_white()
+        if self.pos >= len(self.src):
+            self.token = Token(TokenKind.EOF, "")
+            return
+
+        c = self.cur_char()
+        op = _operator_table.get(c, None)
+        if op is not None:
+            self.token = Token(op, c)
             self.pos += 1
-        else:
-            self.look = ""  # End of input
+            return
+        elif c.isalpha():
+            name = ""
+            while self.cur_char().isalnum():
+                name += self.cur_char().upper()
+                self.pos += 1
+            self.token = Token(TokenKind.NAME, name)
+            return
+        elif c.isdigit():
+            num = ""
+            while self.cur_char().isdigit():
+                num += self.cur_char()
+                self.pos += 1
+            self.token = Token(TokenKind.NUMBER, num)
+            return
+
+        self.abort(f"Unrecognized character: '{c}'")
 
     def abort(self, msg: str):
         raise Exception(f"Error: {msg}")
 
     def expected(self, s: str):
-        self.abort(f"{s} expected")
+        self.abort(f"{s} expected [has token '{self.token.value}']")
 
-    def match(self, x: str):
-        if self.look == x:
-            self.get_char()
-            self.skip_white()
+    def match(self, kind: TokenKind) -> str:
+        """Matches the current token's kind and returns its value.
+
+        Advances to the next token if matched; otherwise, aborts.
+        """
+        if self.token.kind != kind:
+            self.expected(f"'{kind}'")
+        value = self.token.value
+        self.advance_scanner()
+        return value
+
+    def match_name(self, name: str):
+        if self.token.kind == TokenKind.NAME and self.token.value == name:
+            self.advance_scanner()
         else:
-            self.expected(f"'{x}'")
+            self.expected(f"'{name}'")
+
+    def token_is_name(self, name: str) -> bool:
+        return self.token.kind == TokenKind.NAME and self.token.value == name
 
     def generate_loop_labels(self) -> dict[str, str]:
         self.loopcount += 1
@@ -44,27 +139,18 @@ class Compiler:
             "break": f"$breakloop{self.loopcount}",
         }
 
-    def get_name(self) -> str:
-        if not self.look.isalpha():
-            self.expected("Name")
-        name = self.look.upper()
-        self.get_char()
-        self.skip_white()
-        return name
-
-    def get_num(self) -> str:
-        if not self.look.isdigit():
-            self.expected("Integer")
-        num = ""
-        while self.look.isdigit():
-            num += self.look
-            self.get_char()
-        self.skip_white()
-        return num
+    def ident(self):
+        name = self.match(TokenKind.NAME)
+        if self.token.kind == TokenKind.LPAREN:
+            self.advance_scanner()
+            self.match(TokenKind.RPAREN)
+            self.emit_ln(f"call ${name}")
+        else:
+            self.emit_ln(f"global.get ${name}")
 
     def skip_white(self):
-        while self.look.isspace():
-            self.get_char()
+        while self.cur_char().isspace():
+            self.pos += 1
 
     def emit_ln(self, s: str):
         self.output.write(" " * self.indent + s + "\n")
@@ -80,57 +166,56 @@ class Compiler:
             self.abort(f"Duplicate global variable {name}")
         self.symtable.add(name)
         value = "0"
-        if self.look == "=":
-            self.match("=")
-            if self.look == "-":
-                self.match("-")
-                value = "-" + self.get_num()
+        if self.token.kind == TokenKind.EQUAL:
+            self.advance_scanner()
+            if self.token.kind == TokenKind.SUB:
+                self.advance_scanner()
+                value = "-" + self.match(TokenKind.NUMBER)
             else:
-                value = self.get_num()
+                value = self.match(TokenKind.NUMBER)
         self.emit_ln(f"(global ${name} (mut i32) (i32.const {value}))")
 
     def undefined(self, name: str):
         self.abort(f"Undefined identifier {name}")
 
     def prog(self):
-        self.match("p")
+        self.match_name("P")
         self.prolog()
         self.indent += 2
         self.top_decls()
         self.main()
-        self.match(".")
+        self.match(TokenKind.DOT)
         self.indent -= 2
         self.epilog()
 
     # <main> ::= 'b' <block> 'e'
     def main(self):
-        self.match("b")
+        self.match_name("B")
         self.emit_ln('(func $main (export "main") (result i32)')
         self.indent += 2
         self.block()
         self.emit_ln("global.get $X")
         self.indent -= 2
         self.emit_ln(")")
-        self.match("e")
+        self.match_name("E")
 
     # <top-level decls> ::= ( <data declaration> )*
     # <data declaration> ::= 'v' <var-list>
     def top_decls(self):
-        while self.look != "b":
-            match self.look:
-                case "v":
-                    self.decl()
-                case _:
-                    self.abort(f"unrecognized keyword '{self.look}'")
+        while not self.token_is_name("B"):
+            if self.token_is_name("V"):
+                self.decl()
+            else:
+                self.abort(f"unrecognized keyword '{self.token.value}'")
 
     # <var-list> ::= <var> (, <var> )*
     # <var> ::= <ident> [ = <num> ]
     def decl(self):
-        self.match("v")
-        self.alloc_global(self.get_name())
-        while self.look == ",":
-            self.match(",")
-            self.alloc_global(self.get_name())
+        self.match_name("V")
+        self.alloc_global(self.match(TokenKind.NAME))
+        while self.token.kind == TokenKind.COMMA:
+            self.advance_scanner()
+            self.alloc_global(self.match(TokenKind.NAME))
 
     # <if> ::= I <bool-expression> <block> [ L <block>] E
     # <while> ::= W <bool-expression> <block> E
@@ -138,13 +223,17 @@ class Compiler:
     # <statement> ::= <if> | <while> | <assignment>
     def block(self, breakloop_label: str = ""):
         # breakloop_label is used for emitting break statements inside loops.
-        while self.look not in ("e", "l", ""):
-            match self.look:
-                case "i":
+        while self.token.kind != TokenKind.EOF:
+            if self.token.kind != TokenKind.NAME:
+                self.abort("expected a statement")
+            match self.token.value:
+                case "E" | "L":
+                    break
+                case "I":
                     self.do_if(breakloop_label)
-                case "w":
+                case "W":
                     self.do_while()
-                case "b":
+                case "B":
                     self.do_break(breakloop_label)
                 case _:
                     self.assignment()
@@ -161,61 +250,59 @@ class Compiler:
     # <not-factor> ::= [ '!' ] <relation>
     # <relation> ::= <expression> [ <relop> <expression> ]
     def assignment(self):
-        name = self.get_name()
+        name = self.match(TokenKind.NAME)
         if name not in self.symtable:
             self.undefined(name)
-        self.match("=")
+        self.match(TokenKind.EQUAL)
         self.bool_expression()
         self.emit_ln(f"global.set ${name}")
 
     def factor(self):
-        if self.look == "(":
-            self.match("(")
+        if self.token.kind == TokenKind.LPAREN:
+            self.advance_scanner()
             self.bool_expression()
-            self.match(")")
-        elif self.look.isalpha():
-            name = self.get_name()
-            if name not in self.symtable:
-                self.undefined(name)
-            self.emit_ln(f"global.get ${name}")
+            self.match(TokenKind.RPAREN)
+        elif self.token.kind == TokenKind.NAME:
+            self.ident()
         else:
-            self.emit_ln(f"i32.const {self.get_num()}")
+            num = self.match(TokenKind.NUMBER)
+            self.emit_ln(f"i32.const {num}")
 
     def neg_factor(self):
-        self.match("-")
-        if self.look.isdigit():
-            self.emit_ln(f"i32.const -{self.get_num()}")
+        self.match(TokenKind.SUB)
+        if self.token.kind == TokenKind.NUMBER:
+            self.emit_ln(f"i32.const -{self.match(TokenKind.NUMBER)}")
         else:
             self.factor()
             self.emit_ln("i32.const -1")
             self.emit_ln("i32.mul")
 
     def first_factor(self):
-        match self.look:
-            case "+":
-                self.match("+")
+        match self.token.kind:
+            case TokenKind.ADD:
+                self.advance_scanner()
                 self.factor()
-            case "-":
+            case TokenKind.SUB:
                 self.neg_factor()
             case _:
                 self.factor()
 
     def multiply(self):
-        self.match("*")
+        self.advance_scanner()
         self.factor()
         self.emit_ln("i32.mul")
 
     def divide(self):
-        self.match("/")
+        self.advance_scanner()
         self.factor()
         self.emit_ln("i32.div_s")
 
     def term1(self):
         # Common code for term and first_term
-        while self.look in ("*", "/"):
-            if self.look == "*":
+        while self.token.kind in (TokenKind.MUL, TokenKind.DIV):
+            if self.token.kind == TokenKind.MUL:
                 self.multiply()
-            elif self.look == "/":
+            elif self.token.kind == TokenKind.DIV:
                 self.divide()
 
     def term(self):
@@ -227,60 +314,60 @@ class Compiler:
         self.term1()
 
     def add(self):
-        self.match("+")
+        self.advance_scanner()
         self.term()
         self.emit_ln("i32.add")
 
     def subtract(self):
-        self.match("-")
+        self.advance_scanner()
         self.term()
         self.emit_ln("i32.sub")
 
     def expression(self):
         self.first_term()
-        while self.look in ("+", "-"):
-            if self.look == "+":
+        while self.token.kind in (TokenKind.ADD, TokenKind.SUB):
+            if self.token.kind == TokenKind.ADD:
                 self.add()
-            elif self.look == "-":
+            elif self.token.kind == TokenKind.SUB:
                 self.subtract()
 
     def equals(self):
-        self.match("=")
+        self.advance_scanner()
         self.expression()
         self.emit_ln("i32.eq")
 
     def not_equals(self):
-        self.match("#")
+        self.advance_scanner()
         self.expression()
         self.emit_ln("i32.ne")
 
     def less_than(self):
-        self.match("<")
+        self.advance_scanner()
         self.expression()
         self.emit_ln("i32.lt_s")
 
     def greater_than(self):
-        self.match(">")
+        self.advance_scanner()
         self.expression()
         self.emit_ln("i32.gt_s")
 
     def relation(self):
         self.expression()
-        match self.look:
-            case "=":
+        match self.token.kind:
+            case TokenKind.EQUAL:
                 self.equals()
-            case "#":
+            case TokenKind.NOT_EQUAL:
                 self.not_equals()
-            case "<":
+            case TokenKind.LESS_THAN:
                 self.less_than()
-            case ">":
+            case TokenKind.GREATER_THAN:
                 self.greater_than()
             case _:
                 pass
 
     def not_factor(self):
-        if self.look == "!":
-            self.match("!")
+        if self.token.kind == TokenKind.NOT:
+            self.advance_scanner()
             self.relation()
             self.emit_ln("i32.eqz")
         else:
@@ -288,53 +375,53 @@ class Compiler:
 
     def bool_term(self):
         self.not_factor()
-        while self.look == "&":
-            self.match("&")
+        while self.token.kind == TokenKind.AND:
+            self.advance_scanner()
             self.not_factor()
             self.emit_ln("i32.and")
 
     def bool_or(self):
-        self.match("|")
+        self.advance_scanner()
         self.bool_term()
         self.emit_ln("i32.or")
 
     def bool_xor(self):
-        self.match("~")
+        self.advance_scanner()
         self.bool_term()
         self.emit_ln("i32.xor")
 
     def bool_expression(self):
         self.bool_term()
-        while self.look in ("|", "~"):
-            if self.look == "|":
+        while self.token.kind in (TokenKind.OR, TokenKind.XOR):
+            if self.token.kind == TokenKind.OR:
                 self.bool_or()
-            elif self.look == "~":
+            elif self.token.kind == TokenKind.XOR:
                 self.bool_xor()
 
     def do_if(self, breakloop_label: str = ""):
-        self.match("i")
+        self.advance_scanner()
         self.bool_expression()
         self.emit_ln("if")
         self.indent += 2
         self.block(breakloop_label)
         self.indent -= 2
-        if self.look == "l":
-            self.match("l")
+        if self.token_is_name("L"):
+            self.advance_scanner()
             self.emit_ln("else")
             self.indent += 2
             self.block(breakloop_label)
             self.indent -= 2
-        self.match("e")
+        self.match_name("E")
         self.emit_ln("end")
 
     def do_break(self, breakloop_label: str):
         if breakloop_label == "":
             self.abort("No loop to break from")
-        self.match("b")
+        self.match_name("B")
         self.emit_ln(f"br {breakloop_label}")
 
     def do_while(self):
-        self.match("w")
+        self.match_name("W")
         labels = self.generate_loop_labels()
         self.emit_ln(f"loop {labels['loop']}")
         self.indent += 2
@@ -347,7 +434,7 @@ class Compiler:
         self.emit_ln(f"br_if {labels['break']}")
         self.block(labels["break"])
         self.emit_ln(f"br {labels['loop']}")
-        self.match("e")
+        self.match_name("E")
         self.indent -= 2
         self.emit_ln("end")  # end block
         self.indent -= 2

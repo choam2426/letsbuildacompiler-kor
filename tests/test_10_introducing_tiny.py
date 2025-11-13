@@ -29,17 +29,23 @@ class TestCompileAndExecute(unittest.TestCase):
         return [line.strip() for line in text.splitlines() if line.strip()]
 
     def test_basic_assign(self):
-        result = self.compile_and_run("p vx,y=5 b x=y+7 e.")
+        result = self.compile_and_run("p v x,y=5 b x=y+7 e.")
         self.assertEqual(result, 12)
 
-        result = self.compile_and_run("p vx=6,y=5 b x=y+7+x e.")
+        result = self.compile_and_run("p v x=6,y=5 b x=y+7+x e.")
         self.assertEqual(result, 18)
+
+    def test_longer_var_names(self):
+        result = self.compile_and_run(
+            "p v firstVar=10,secondVar=20, x b x=firstVar+secondVar e."
+        )
+        self.assertEqual(result, 30)
 
     def test_assign_boolean_expr(self):
         result = self.compile_and_run(
             """
         p
-            vx=8,y,z
+            v x=8,y,z
         b
             y = x = 8
             z = x < 5
@@ -50,19 +56,21 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 1)
 
-        result = self.compile_and_run("""
+        result = self.compile_and_run(
+            """
         p
-            vx=8,y=3,z=2
+            v x=8,y=3,z=2
         b
             x = (y + 5 = 8) & (z < 3)
         e.
-        """)
+        """
+        )
         self.assertEqual(result, 1)
 
         result = self.compile_and_run(
             """
         p
-            vx=8,y=4,z=2
+            v x=8,y=4,z=2
         b
             x = (y + 5 = 8) & (z < 3)
         e.
@@ -74,7 +82,7 @@ class TestCompileAndExecute(unittest.TestCase):
         result = self.compile_and_run(
             r"""
         p
-            vx=0,y=10
+            v x=0,y=10
         b
             i x < 5
                 x = 20
@@ -89,7 +97,7 @@ class TestCompileAndExecute(unittest.TestCase):
         result = self.compile_and_run(
             r"""
         p
-            vx=0,y=10
+            v x=0,y=10
         b
             i x > 5
                 x = 20
@@ -105,7 +113,7 @@ class TestCompileAndExecute(unittest.TestCase):
         result = self.compile_and_run(
             r"""
         p
-            vx=0,y=5
+            v x=0,y=5
         b
             w y > 0
                 x = x + 2
@@ -120,7 +128,7 @@ class TestCompileAndExecute(unittest.TestCase):
         result = self.compile_and_run(
             r"""
         p     
-            vx=0,y=5
+            v x=0,y=5
         b
             w y > 0
                 x = x + 2

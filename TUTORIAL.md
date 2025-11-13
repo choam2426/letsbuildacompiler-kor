@@ -316,3 +316,10 @@ place in the parser (which was focusing on small snippets of code, like
 individual expressions or sequences of statements). In this part, we finally get
 to see a top-level `prog` method responsible for compiling the entire program,
 so it's a natural place to include the prolog + epilog calls.
+
+## Part 10: Introducing "Tiny"
+
+TODO: the single-char version is in commit history
+TODO: original still has single-char keywords for loops / if, etc, we do
+multi-char.
+
