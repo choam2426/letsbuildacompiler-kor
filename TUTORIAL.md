@@ -44,8 +44,8 @@ the expression `2+3*4` will compile down to:
 
 The tests for this part (in `tests/test_02_expression_parsing.py`) include a
 full testing harness that constructs a WASM module with a single "main"
-function, emits the compiled expression into it, and uses `wasm-tools` and
-`wasmtime` to execute it and report the result, which can then be compared
+function, emits the compiled expression into it, and uses the `wasmtime-py`
+bindings to execute it and report the result, which can then be compared
 to an expected value.
 
 ## Part 3: More Expressions
@@ -188,7 +188,7 @@ e
 ```
 
 For this part, it was important for me to get back to full execution testing
-(using `wasm-tools` and `wasmtime`, like in part 2), since the emitted code
+(using `wasmtime-py`, like in part 2), since the emitted code
 is becoming increasingly complex and full testing is essential to ensure that
 we're emitting valid code that works.
 
@@ -319,9 +319,54 @@ so it's a natural place to include the prolog + epilog calls.
 
 ## Part 10: Introducing "Tiny"
 
-TODO: the single-char version is in commit history
-TODO: original still has single-char keywords for loops / if, etc, we do
-multi-char.
-TODO: the global stuff
-TODO: update notes on running command-line tools
+This part combines all the learnings from the previous parts to create a
+small language named TINY. It starts with a single-char version and proceeds
+to incorporate the lexical scanner from part 7 to support multi-char tokens.
+That said, it still sticks to single-character keywords (like `i` for IF,
+`w` for WHILE and so on).
 
+In our code, you can find the single-char version in the commit history; the
+final code includes the lexical scanner and supports multi-character operators
+and variable names.
+
+TINY is a more complete environment than previous attempts, so we can finally
+tie together how variables are declared and used. Variable declarations
+(names following `v`) in TINY are translated to `$global` declarations in
+WASM, and all variables are mapped to globals. Generally, this is the scaffold
+of the WASM module we emit:
+
+```
+(module
+  (func $read_i32 (import "" "read_i32") (result i32))
+  (func $write_i32 (import "" "write_i32") (param i32))
+  (global $X (mut i32) (i32.const 8))
+  ;; ... more globals
+  (func $main (export "main") (result i32)
+    ;; ... code
+    global.get $X  ;; implicit return of $X, for testing
+  )
+)
+```
+
+Reference to variables like `y` in the TINY code are translated to global
+fetches (`global.get $Y`) or assignments (`global.set $Y`).
+
+TINY also supports IO: reading variable values from stdin and writing them
+to stdout. WASM is designed for embedding in a host environment, so we handle
+these by importing the special `read_i32` and `write_i32` functions, which
+are then provided by the testing harness. Thus only the host Python code
+has to deal with IO (alternatively we could use WASI to do IO directly from
+the WASM, but this would result in much more code and would be less flexible).
+
+Our code uses `read` and `write` for the IO functions, rather than `R` and `W`,
+so code looks like:
+
+```
+  p
+      v x,y,z
+  b
+      read(x, y)
+      z = x + y
+      write(z, x * 2, y * 3)
+  e.
+```
