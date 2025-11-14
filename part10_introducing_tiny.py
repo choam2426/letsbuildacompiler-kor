@@ -169,6 +169,7 @@ class Compiler:
 
     def prolog(self):
         self.emit_ln("(module")
+        self.emit_ln('  (func $read_i32 (import "" "read_i32") (result i32))')
         self.emit_ln('  (func $write_i32 (import "" "write_i32") (param i32))')
 
     def epilog(self):
@@ -257,6 +258,8 @@ class Compiler:
                     self.do_while()
                 case "B":
                     self.do_break(breakloop_label)
+                case "READ":
+                    self.do_read()
                 case "WRITE":
                     self.do_write()
                 case _:
@@ -275,10 +278,13 @@ class Compiler:
     # <relation> ::= <expression> [ <relop> <expression> ]
     def assignment(self):
         name = self.match(TokenKind.NAME)
-        if name not in self.symtable:
-            self.undefined(name)
         self.match(TokenKind.EQUAL)
         self.bool_expression()
+        self.emit_assignment(name)
+
+    def emit_assignment(self, name: str):
+        if name not in self.symtable:
+            self.undefined(name)
         self.emit_ln(f"global.set ${name}")
 
     def factor(self):
@@ -477,6 +483,19 @@ class Compiler:
         self.emit_ln("end")  # end block
         self.indent -= 2
         self.emit_ln("end")  # end loop
+
+    def do_read(self):
+        self.advance_scanner()
+        self.match(TokenKind.LPAREN)
+        self.emit_ln("call $read_i32")
+        name = self.match(TokenKind.NAME)
+        self.emit_assignment(name)
+        while self.token.kind == TokenKind.COMMA:
+            self.advance_scanner()
+            self.emit_ln("call $read_i32")
+            name = self.match(TokenKind.NAME)
+            self.emit_assignment(name)
+        self.match(TokenKind.RPAREN)
 
     def do_write(self):
         self.advance_scanner()

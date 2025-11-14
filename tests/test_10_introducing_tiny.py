@@ -17,10 +17,14 @@ class TestCompileAndExecute(unittest.TestCase):
         return output.getvalue()
 
     def compile_and_run_with_io(
-        self, src: str, output: TextIO | None = None, show=False
+        self,
+        src: str,
+        instream: TextIO | None = None,
+        outstream: TextIO | None = None,
+        show=False,
     ) -> int:
         full_code = self._compile_to_wasm(src, show=show)
-        return run_wasm_with_io(full_code, output)
+        return run_wasm_with_io(full_code, instream=instream, outstream=outstream)
 
     def split_emission(self, output):
         """Return compiler emission as a list of non-empty lines.
@@ -177,11 +181,42 @@ class TestCompileAndExecute(unittest.TestCase):
             write(y + 3, x * 2)
         e.
         """,
-            output=out,
+            instream=None,
+            outstream=out,
         )
         self.assertEqual(result, 5)
         emitted_lines = self.split_emission(out)
         self.assertEqual(emitted_lines, ["5", "14", "10"])
+
+    def test_read_statement(self):
+        inp = io.StringIO("7\n15\n")
+        result = self.compile_and_run_with_io(
+            r"""
+        p
+            v x,y,z
+        b
+            read(z)
+            read(y)
+            x = z + y
+        e.
+        """,
+            instream=inp,
+        )
+        self.assertEqual(result, 22)
+
+        inp = io.StringIO("3\n4\n5\n")
+        result = self.compile_and_run_with_io(
+            r"""
+        p
+            v x,y,z
+        b
+            read(x, y, z)
+            x = y * z * x
+        e.
+        """,
+            instream=inp,
+        )
+        self.assertEqual(result, 60)
 
 
 if __name__ == "__main__":

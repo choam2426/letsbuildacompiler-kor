@@ -10,6 +10,14 @@ def make_writer_func(output: TextIO):
     return write_i32
 
 
+def make_reader_func(input: TextIO):
+    def read_i32() -> int:
+        line = input.readline()
+        return int(line.strip())
+
+    return read_i32
+
+
 def run_wasm(code: str) -> int:
     store = Store()
     module = Module(store.engine, code)
@@ -19,14 +27,25 @@ def run_wasm(code: str) -> int:
     return result
 
 
-def run_wasm_with_io(code: str, output: TextIO | None = None) -> int:
+# TODO: change to named import parameters
+def run_wasm_with_io(
+    code: str, instream: TextIO | None = None, outstream: TextIO | None = None
+) -> int:
     store = Store()
     module = Module(store.engine, code)
-    if output is None:
-        output = io.StringIO()
-    write_i32_func = Func(
-        store, FuncType([ValType.i32()], []), make_writer_func(output)
+
+    if instream is None:
+        instream = io.StringIO()
+    read_i32_func = Func(
+        store, FuncType([], [ValType.i32()]), make_reader_func(instream)
     )
-    instance = Instance(store, module, [write_i32_func])
+
+    if outstream is None:
+        outstream = io.StringIO()
+    write_i32_func = Func(
+        store, FuncType([ValType.i32()], []), make_writer_func(outstream)
+    )
+
+    instance = Instance(store, module, [read_i32_func, write_i32_func])
     main_func = instance.exports(store)["main"]
     return main_func(store)
