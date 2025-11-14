@@ -370,3 +370,32 @@ so code looks like:
       write(z, x * 2, y * 3)
   e.
 ```
+
+## Part 11: Lexical Scan Revisited
+
+In this part the author fixes the lexical scanner of TINY to overcome several
+limitations.
+
+The choices we made for Part 7 pay off really well now, because our scanner
+is already structured in the right way and doesn't require any changes.
+Our `advance_scanner` method is exactly `Next` in the original tutorial - it
+similarly skips whitespace first, doesn't give newlines a special treatment,
+etc.
+
+Now parsing methods look the same as well, e.g.:
+
+```python
+def add(self):
+    self.advance_scanner()
+    self.term()
+    self.emit_ln("i32.add")
+```
+
+Even methods like `block` are more aligned now: since our scanner already
+places a complete `Token` in `self.token`, `block` doesn't have to consume
+anything before identifying the kind of statement.
+
+So there's no code required for this part: the original tutorial made some
+slight modifications like getting rid of the `PROGRAM` keyword (or rather `p`),
+but that doesn't really justify copying over the 500-line compiler from our
+part 10.
