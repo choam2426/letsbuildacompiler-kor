@@ -257,6 +257,8 @@ class Compiler:
                     self.do_while()
                 case "B":
                     self.do_break(breakloop_label)
+                case "WRITE":
+                    self.do_write()
                 case _:
                     self.assignment()
 
@@ -475,3 +477,14 @@ class Compiler:
         self.emit_ln("end")  # end block
         self.indent -= 2
         self.emit_ln("end")  # end loop
+
+    def do_write(self):
+        self.advance_scanner()
+        self.match(TokenKind.LPAREN)
+        self.expression()
+        self.emit_ln("call $write_i32")
+        while self.token.kind == TokenKind.COMMA:
+            self.advance_scanner()
+            self.expression()
+            self.emit_ln("call $write_i32")
+        self.match(TokenKind.RPAREN)

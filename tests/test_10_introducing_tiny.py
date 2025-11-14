@@ -166,6 +166,23 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 6)
 
+    def test_write_statement(self):
+        out = io.StringIO()
+        result = self.compile_and_run_with_io(
+            r"""
+        p
+            v x=5,y=11
+        b
+            write(x)
+            write(y + 3, x * 2)
+        e.
+        """,
+            output=out,
+        )
+        self.assertEqual(result, 5)
+        emitted_lines = self.split_emission(out)
+        self.assertEqual(emitted_lines, ["5", "14", "10"])
+
 
 if __name__ == "__main__":
     unittest.main()
