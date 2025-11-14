@@ -218,6 +218,26 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 60)
 
+    def test_read_and_write(self):
+        inp = io.StringIO("8\n12\n")
+        out = io.StringIO()
+        result = self.compile_and_run_with_io(
+            r"""
+        p
+            v x,y,z
+        b
+            read(x, y)
+            z = x + y
+            write(z, x * 2, y * 3)
+        e.
+        """,
+            instream=inp,
+            outstream=out,
+        )
+        self.assertEqual(result, 8)
+        emitted_lines = self.split_emission(out)
+        self.assertEqual(emitted_lines, ["20", "16", "36"])
+
 
 if __name__ == "__main__":
     unittest.main()

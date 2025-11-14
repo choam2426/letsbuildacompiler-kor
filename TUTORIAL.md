@@ -323,4 +323,5 @@ TODO: the single-char version is in commit history
 TODO: original still has single-char keywords for loops / if, etc, we do
 multi-char.
 TODO: the global stuff
+TODO: update notes on running command-line tools
 

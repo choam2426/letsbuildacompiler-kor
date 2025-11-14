@@ -27,7 +27,6 @@ def run_wasm(code: str) -> int:
     return result
 
 
-# TODO: change to named import parameters
 def run_wasm_with_io(
     code: str, instream: TextIO | None = None, outstream: TextIO | None = None
 ) -> int:
