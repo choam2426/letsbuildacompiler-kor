@@ -399,3 +399,15 @@ So there's no code required for this part: the original tutorial made some
 slight modifications like getting rid of the `PROGRAM` keyword (or rather `p`),
 but that doesn't really justify copying over the 500-line compiler from our
 part 10.
+
+## Part 12: Miscellany
+
+Summary:
+
+ (1) Semicolons are TERMINATORS, not separators
+
+ (2) Semicolons are OPTIONAL
+
+ (3) Comments are delimited by curly braces
+
+ (4) Comments MAY be nested

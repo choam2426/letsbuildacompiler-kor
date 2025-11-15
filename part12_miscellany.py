@@ -25,6 +25,7 @@ class TokenKind(Enum):
     RPAREN = auto()
     DOT = auto()
     COMMA = auto()
+    SEMICOLON = auto()
 
     NUMBER = auto()
     NAME = auto()
@@ -52,6 +53,7 @@ _operator_table = {
     "<=": TokenKind.LESS_EQUAL,
     ".": TokenKind.DOT,
     ",": TokenKind.COMMA,
+    ";": TokenKind.SEMICOLON,
 }
 
 
@@ -170,6 +172,10 @@ class Compiler:
     def token_is_name(self, name: str) -> bool:
         return self.token.kind == TokenKind.NAME and self.token.value == name
 
+    def semi(self):
+        if self.token.kind == TokenKind.SEMICOLON:
+            self.advance_scanner()
+
     def generate_loop_labels(self) -> dict[str, str]:
         self.loopcount += 1
         return {
@@ -216,6 +222,7 @@ class Compiler:
 
     def prog(self):
         self.match_name("P")
+        self.semi()
         self.prolog()
         self.indent += 2
         self.top_decls()
@@ -235,12 +242,13 @@ class Compiler:
         self.emit_ln(")")
         self.match_name("E")
 
-    # <top-level decls> ::= ( <data declaration> )*
+    # <top-level decls> ::= <data declaration> ( ';' <data declaration> )*
     # <data declaration> ::= 'v' <var-list>
     def top_decls(self):
         while not self.token_is_name("B"):
             if self.token_is_name("V"):
                 self.decl()
+                self.semi()
             else:
                 self.abort(f"unrecognized keyword '{self.token.value}'")
 
@@ -255,28 +263,38 @@ class Compiler:
 
     # <if> ::= I <bool-expression> <block> [ L <block>] E
     # <while> ::= W <bool-expression> <block> E
-    # <block> ::= ( <statement> )*
-    # <statement> ::= <if> | <while> | <assignment>
+    # <block> ::= <statement> ( ';' <statement> )*
+    # <statement> ::= <if> | <while> | <assignment> | null
+    def statement(self, breakloop_label: str = "") -> bool:
+        """Handles a single statement starting at the current token.
+
+        Returns True if the statement ends the block, False otherwise.
+        """
+        if self.token.kind != TokenKind.NAME:
+            self.abort(f"expected a statement [got '{self.token.value}']")
+        match self.token.value:
+            case "E" | "L":
+                return True
+            case "I":
+                self.do_if(breakloop_label)
+            case "W":
+                self.do_while()
+            case "B":
+                self.do_break(breakloop_label)
+            case "READ":
+                self.do_read()
+            case "WRITE":
+                self.do_write()
+            case _:
+                self.assignment()
+        return False
+
     def block(self, breakloop_label: str = ""):
         # breakloop_label is used for emitting break statements inside loops.
         while self.token.kind != TokenKind.EOF:
-            if self.token.kind != TokenKind.NAME:
-                self.abort(f"expected a statement [got '{self.token.value}']")
-            match self.token.value:
-                case "E" | "L":
-                    break
-                case "I":
-                    self.do_if(breakloop_label)
-                case "W":
-                    self.do_while()
-                case "B":
-                    self.do_break(breakloop_label)
-                case "READ":
-                    self.do_read()
-                case "WRITE":
-                    self.do_write()
-                case _:
-                    self.assignment()
+            if self.statement(breakloop_label):
+                break
+            self.semi()
 
     # <assignment> ::= <ident> '=' <bool-expression>
     # <expression> ::= <first term> ( <addop> <term> )*
