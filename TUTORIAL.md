@@ -403,18 +403,18 @@ part 10.
 ## Part 12: Miscellany
 
 This part discusses some options for implementing semicolons and comments, and
-settles on the following decision:
+settles on the following decisions:
 
 1. Semicolons are TERMINATORS, not separators
 2. Semicolons are OPTIONAL
 3. Comments are delimited by curly braces
 4. Comments MAY be nested
 
-Our implementation for this part follows these, with the slight adjustments
-required for our scanner structure. Since semicolons are optional anyway,
-we allow them at the end of *each* statement in a block; this is much
-simpler to implement. Having split `statement` into a separate method as in the
-original tutorial, our `block` is just:
+Our implementation for this part follows these, with the expected slight adjustments
+for our scanner structure. Since semicolons are optional anyway, we allow them
+at the end of *each* statement in a block; this is much simpler to implement.
+Having split `statement` into a separate method as in the original tutorial, our
+`block` is just:
 
 ```python
 def block(self, breakloop_label: str = ""):
@@ -424,10 +424,11 @@ def block(self, breakloop_label: str = ""):
         self.semi()
 ```
 
-With the added twist that `statement` returns `True` when it encounters an
-ending keyword (`E` or `L`), so that `block` knows to exit.
+And `statement` doesn't have to deal with semicolons at all. Since `statement`
+now is a separate method, it returns `True` when it encounters an ending keyword
+(`E` or `L`), so that `block` knows to exit.
 
-The comments are implemented exactly like in the original tutorial, in
+Comments are implemented exactly like in the original tutorial, in
 `skip_white` (no other methods need changes). It can be educational to diff
 `part10_introducing_tiny.py` and `part12_miscellany.py` to see exactly what
 changes are required.
