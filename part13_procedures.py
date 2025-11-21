@@ -221,7 +221,7 @@ class Compiler:
             self.emit_ln(f"global.get ${name}")
 
     def prog(self):
-        self.match_name("P")
+        self.match_name("PROGRAM")
         self.semi()
         self.prolog()
         self.indent += 2
@@ -231,22 +231,22 @@ class Compiler:
         self.indent -= 2
         self.epilog()
 
-    # <main> ::= 'b' <block> 'e'
+    # <main> ::= 'BEGIN' <block> 'END'
     def main(self):
-        self.match_name("B")
+        self.match_name("BEGIN")
         self.emit_ln('(func $main (export "main") (result i32)')
         self.indent += 2
         self.block()
         self.emit_ln("global.get $X")
         self.indent -= 2
         self.emit_ln(")")
-        self.match_name("E")
+        self.match_name("END")
 
     # <top-level decls> ::= <data declaration> ( ';' <data declaration> )*
-    # <data declaration> ::= 'v' <var-list>
+    # <data declaration> ::= 'VAR' <var-list>
     def top_decls(self):
-        while not self.token_is_name("B"):
-            if self.token_is_name("V"):
+        while not self.token_is_name("BEGIN"):
+            if self.token_is_name("VAR"):
                 self.decl()
                 self.semi()
             else:
@@ -255,14 +255,14 @@ class Compiler:
     # <var-list> ::= <var> (, <var> )*
     # <var> ::= <ident> [ = <num> ]
     def decl(self):
-        self.match_name("V")
+        self.match_name("VAR")
         self.alloc_global(self.match(TokenKind.NAME))
         while self.token.kind == TokenKind.COMMA:
             self.advance_scanner()
             self.alloc_global(self.match(TokenKind.NAME))
 
-    # <if> ::= I <bool-expression> <block> [ L <block>] E
-    # <while> ::= W <bool-expression> <block> E
+    # <if> ::= IF <bool-expression> <block> [ ELSE <block>] END
+    # <while> ::= WHILE <bool-expression> <block> END
     # <block> ::= <statement> ( ';' <statement> )*
     # <statement> ::= <if> | <while> | <assignment> | null
     def statement(self, breakloop_label: str = "") -> bool:
@@ -273,13 +273,13 @@ class Compiler:
         if self.token.kind != TokenKind.NAME:
             self.abort(f"expected a statement [got '{self.token.value}']")
         match self.token.value:
-            case "E" | "L":
+            case "END" | "ELSE":
                 return True
-            case "I":
+            case "IF":
                 self.do_if(breakloop_label)
-            case "W":
+            case "WHILE":
                 self.do_while()
-            case "B":
+            case "BREAK":
                 self.do_break(breakloop_label)
             case _:
                 self.assignment()
@@ -476,23 +476,23 @@ class Compiler:
         self.indent += 2
         self.block(breakloop_label)
         self.indent -= 2
-        if self.token_is_name("L"):
+        if self.token_is_name("ELSE"):
             self.advance_scanner()
             self.emit_ln("else")
             self.indent += 2
             self.block(breakloop_label)
             self.indent -= 2
-        self.match_name("E")
+        self.match_name("END")
         self.emit_ln("end")
 
     def do_break(self, breakloop_label: str):
         if breakloop_label == "":
             self.abort("No loop to break from")
-        self.match_name("B")
+        self.match_name("BREAK")
         self.emit_ln(f"br {breakloop_label}")
 
     def do_while(self):
-        self.match_name("W")
+        self.match_name("WHILE")
         labels = self.generate_loop_labels()
         self.emit_ln(f"loop {labels['loop']}")
         self.indent += 2
@@ -505,7 +505,7 @@ class Compiler:
         self.emit_ln(f"br_if {labels['break']}")
         self.block(labels["break"])
         self.emit_ln(f"br {labels['loop']}")
-        self.match_name("E")
+        self.match_name("END")
         self.indent -= 2
         self.emit_ln("end")  # end block
         self.indent -= 2

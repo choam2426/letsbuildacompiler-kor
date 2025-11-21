@@ -27,25 +27,25 @@ class TestCompileAndExecute(unittest.TestCase):
     def test_comments(self):
         result = self.compile_and_run_with_io(
             """
-        p
-            v x=8,y,z { a comment }
-        b
+        program
+            var x=8,y,z { a comment }
+        begin
             y = x = 8 {another comment}
             z = x {embedded comment} < 5
             y = y & !z
             x = y + { 9 + this is a comment doesn't count } 0
-        e.
+        end.
         """
         )
         self.assertEqual(result, 1)
 
         result = self.compile_and_run_with_io(
             """
-        p
-            v x=8,y=3,z=2 { nested { comments } are ok }
-        b
+        program
+            var x=8,y=3,z=2 { nested { comments } are ok }
+        begin
             x = (y + 5 = 8) & ({ nested { comments } are ok } z < 3)
-        e.
+        end.
         """
         )
         self.assertEqual(result, 1)
@@ -53,14 +53,14 @@ class TestCompileAndExecute(unittest.TestCase):
     def test_semicolons(self):
         result = self.compile_and_run_with_io(
             r"""
-        p ;
-            v x=0;
-            v y=10
-        b
+        program ;
+            var x=0;
+            var y=10
+        begin
             x = x + 5;
             y = y - 2
             x = x + y;
-        e.
+        end.
         """
         )
         self.assertEqual(result, 13)
@@ -68,30 +68,30 @@ class TestCompileAndExecute(unittest.TestCase):
     def test_if_else(self):
         result = self.compile_and_run_with_io(
             r"""
-        p
-            v x=0,y=10
-        b
-            i x < 5
+        program
+            var x=0,y=10
+        begin
+            if x < 5
                 x = 20 ;
-            l
+            else
                 x = 30
-            e
-        e.
+            end
+        end.
         """
         )
         self.assertEqual(result, 20)
 
         result = self.compile_and_run_with_io(
             r"""
-        p
-            v x=0,y=10
-        b
-            i x > 5
+        program
+            var x=0,y=10
+        begin
+            if x > 5
                 x = 20
-            l
+            else
                 x = 30 ;
-            e
-        e.
+            end
+        end.
         """
         )
         self.assertEqual(result, 30)
@@ -99,14 +99,14 @@ class TestCompileAndExecute(unittest.TestCase):
     def test_while_loop(self):
         result = self.compile_and_run_with_io(
             r"""
-        p
-            v x=0,y=5
-        b
-            w y > 0
+        program
+            var x=0,y=5
+        begin
+            while y > 0
                 x = x + 2 ;
                 y = y - 1
-            e
-        e.
+            end
+        end.
         """
         )
         self.assertEqual(result, 10)
@@ -114,17 +114,17 @@ class TestCompileAndExecute(unittest.TestCase):
         # Same but with an early break
         result = self.compile_and_run_with_io(
             r"""
-        p
-            v x=0,y=5
-        b
-            w y > 0
+        program
+            var x=0,y=5
+        begin
+            while y > 0
                 x = x + 2
-                i x = 6
-                    b
-                e
+                if x = 6
+                    break
+                end
                 y = y - 1
-            e
-        e.
+            end
+        end.
         """
         )
         self.assertEqual(result, 6)
