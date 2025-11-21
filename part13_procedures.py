@@ -66,6 +66,8 @@ class Token:
 
 
 class Compiler:
+    # After initialization, the entry point for this compiler is the
+    # toplevel() method.
     def __init__(self, src: str, output: TextIO = sys.stdout):
         self.src = src
         self.pos = 0
@@ -220,19 +222,36 @@ class Compiler:
         else:
             self.emit_ln(f"global.get ${name}")
 
-    def prog(self):
-        self.match_name("PROGRAM")
-        self.semi()
+    def toplevel(self):
         self.prolog()
         self.indent += 2
         self.top_decls()
-        self.main()
-        self.match(TokenKind.DOT)
         self.indent -= 2
         self.epilog()
 
-    # <main> ::= 'BEGIN' <block> 'END'
-    def main(self):
+    # <top-level decl> ::= <data decl> | <procedure> | <main program>
+    # <data decl> ::= 'VAR' <var-list>
+    # <procedure> ::= 'PROCEDURE' <ident> <block> 'END'
+    def top_decls(self):
+        while self.token.kind != TokenKind.DOT:
+            if self.token.kind != TokenKind.NAME:
+                self.abort(
+                    f"expected a top-level declaration [got '{self.token.value}']"
+                )
+            match self.token.value:
+                case "VAR":
+                    self.decl()
+                    self.semi()
+                case "PROCEDURE":
+                    self.procedure()
+                case "PROGRAM":
+                    self.program()
+                case _:
+                    self.abort(f"unrecognized keyword '{self.token.value}'")
+
+    def program(self):
+        self.advance_scanner()  # consume 'PROGRAM'
+        self.match(TokenKind.NAME)  # consume program name
         self.match_name("BEGIN")
         self.emit_ln('(func $main (export "main") (result i32)')
         self.indent += 2
@@ -242,15 +261,8 @@ class Compiler:
         self.emit_ln(")")
         self.match_name("END")
 
-    # <top-level decls> ::= <data declaration> ( ';' <data declaration> )*
-    # <data declaration> ::= 'VAR' <var-list>
-    def top_decls(self):
-        while not self.token_is_name("BEGIN"):
-            if self.token_is_name("VAR"):
-                self.decl()
-                self.semi()
-            else:
-                self.abort(f"unrecognized keyword '{self.token.value}'")
+    def procedure(self):
+        raise NotImplementedError("Procedures not implemented yet")
 
     # <var-list> ::= <var> (, <var> )*
     # <var> ::= <ident> [ = <num> ]

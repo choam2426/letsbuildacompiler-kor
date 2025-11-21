@@ -9,7 +9,7 @@ class TestCompileAndExecute(unittest.TestCase):
     def _compile_to_wasm(self, src: str, show=False) -> str:
         output = io.StringIO()
         compiler = Compiler(src, output=output)
-        compiler.prog()
+        compiler.toplevel()
         if show:
             print("--------- WASM CODE ---------")
             print(output.getvalue())
@@ -27,8 +27,8 @@ class TestCompileAndExecute(unittest.TestCase):
     def test_comments(self):
         result = self.compile_and_run_with_io(
             """
-        program
-            var x=8,y,z { a comment }
+        var x=8,y,z { a comment }
+        program foo
         begin
             y = x = 8 {another comment}
             z = x {embedded comment} < 5
@@ -41,8 +41,8 @@ class TestCompileAndExecute(unittest.TestCase):
 
         result = self.compile_and_run_with_io(
             """
-        program
-            var x=8,y=3,z=2 { nested { comments } are ok }
+        var x=8,y=3,z=2 { nested { comments } are ok }
+        program foo
         begin
             x = (y + 5 = 8) & ({ nested { comments } are ok } z < 3)
         end.
@@ -53,9 +53,10 @@ class TestCompileAndExecute(unittest.TestCase):
     def test_semicolons(self):
         result = self.compile_and_run_with_io(
             r"""
-        program ;
-            var x=0;
-            var y=10
+        var x=0;
+        var y=10
+
+        program foo
         begin
             x = x + 5;
             y = y - 2
@@ -68,8 +69,8 @@ class TestCompileAndExecute(unittest.TestCase):
     def test_if_else(self):
         result = self.compile_and_run_with_io(
             r"""
-        program
-            var x=0,y=10
+        var x=0,y=10
+        program foo
         begin
             if x < 5
                 x = 20 ;
@@ -83,8 +84,8 @@ class TestCompileAndExecute(unittest.TestCase):
 
         result = self.compile_and_run_with_io(
             r"""
-        program
-            var x=0,y=10
+        var x=0,y=10
+        program foo
         begin
             if x > 5
                 x = 20
@@ -99,8 +100,8 @@ class TestCompileAndExecute(unittest.TestCase):
     def test_while_loop(self):
         result = self.compile_and_run_with_io(
             r"""
-        program
-            var x=0,y=5
+        var x=0,y=5
+        program somename
         begin
             while y > 0
                 x = x + 2 ;
@@ -114,8 +115,8 @@ class TestCompileAndExecute(unittest.TestCase):
         # Same but with an early break
         result = self.compile_and_run_with_io(
             r"""
-        program
-            var x=0,y=5
+        var x=0,y=5
+        program othername
         begin
             while y > 0
                 x = x + 2
