@@ -75,15 +75,18 @@ class Compiler:
         self.indent = 0
         self.loopcount = 0
 
-        # Used only to avoid duplicate declarations for now.
         self.symtable = set()
 
         self.advance_scanner()
 
     def cur_char(self) -> str:
+        """Gets the current character without advancing the position.
+
+        Returns an empty string if at end of input.
+        """
         if self.pos < len(self.src):
             return self.src[self.pos]
-        return ""  # End of input
+        return ""
 
     def advance_scanner(self):
         self.skip_white()
@@ -166,6 +169,10 @@ class Compiler:
         return value
 
     def match_name(self, name: str):
+        """Matches the current token as a NAME with the given value.
+
+        Advances to the next token if matched; otherwise, aborts.
+        """
         if self.token.kind == TokenKind.NAME and self.token.value == name:
             self.advance_scanner()
         else:
@@ -175,6 +182,7 @@ class Compiler:
         return self.token.kind == TokenKind.NAME and self.token.value == name
 
     def semi(self):
+        """Optionally consume a semicolon. No-op for other tokens."""
         if self.token.kind == TokenKind.SEMICOLON:
             self.advance_scanner()
 
@@ -221,6 +229,10 @@ class Compiler:
             self.emit_ln(f"global.get ${name}")
 
     def toplevel(self):
+        """Top-level entry point for the compiler.
+
+        Called after initialization to start the compilation process.
+        """
         self.prolog()
         self.indent += 2
         self.top_decls()
@@ -230,12 +242,11 @@ class Compiler:
     # <top-level decl> ::= <data decl> | <procedure> | <main program>
     # <data decl> ::= 'VAR' <var-list>
     # <procedure> ::= 'PROCEDURE' <ident> <block> 'END'
+    # <main program> ::= 'PROGRAM' <ident> <block> 'END'
     def top_decls(self):
         while self.token.kind != TokenKind.DOT:
             if self.token.kind != TokenKind.NAME:
-                self.abort(
-                    f"expected a top-level declaration [got '{self.token.value}']"
-                )
+                self.expected("a top-level declaration")
             match self.token.value:
                 case "VAR":
                     self.decl()
@@ -248,12 +259,16 @@ class Compiler:
                     self.abort(f"unrecognized keyword '{self.token.value}'")
 
     def program(self):
-        self.advance_scanner()  # consume 'PROGRAM'
-        self.match(TokenKind.NAME)  # consume program name
+        # Consume PROGRAM <name> BEGIN
+        self.advance_scanner()
+        self.match(TokenKind.NAME)
         self.match_name("BEGIN")
         self.emit_ln('(func $main (export "main") (result i32)')
         self.indent += 2
         self.block()
+
+        # By convention our "ABI", the main function returns the value of the
+        # global variable X.
         self.emit_ln("global.get $X")
         self.indent -= 2
         self.emit_ln(")")
@@ -281,7 +296,7 @@ class Compiler:
         Returns True if the statement ends the block, False otherwise.
         """
         if self.token.kind != TokenKind.NAME:
-            self.abort(f"expected a statement [got '{self.token.value}']")
+            self.expected("a statement")
         match self.token.value:
             case "END" | "ELSE":
                 return True

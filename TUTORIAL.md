@@ -435,5 +435,6 @@ changes are required.
 
 ## Part 13: Procedures
 
+Note the change in toplevel method of Compiler
 TODO: implement procedures with parameters, using multi-char tokens everywhere.
 
