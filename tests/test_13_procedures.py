@@ -1,5 +1,4 @@
 import io
-from typing import TextIO
 import unittest
 from tests.wasm_util import run_wasm
 from part13_procedures import Compiler

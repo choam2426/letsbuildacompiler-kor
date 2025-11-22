@@ -23,6 +23,7 @@ def run_wasm(code: str) -> int:
     module = Module(store.engine, code)
     instance = Instance(store, module, [])
     main_func = instance.exports(store)["main"]
+    assert isinstance(main_func, Func)
     result = main_func(store)
     return result
 
@@ -47,4 +48,5 @@ def run_wasm_with_io(
 
     instance = Instance(store, module, [read_i32_func, write_i32_func])
     main_func = instance.exports(store)["main"]
+    assert isinstance(main_func, Func)
     return main_func(store)

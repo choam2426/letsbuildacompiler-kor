@@ -3,8 +3,6 @@ from dataclasses import dataclass
 from typing import TextIO
 import sys
 
-# TODO: make this support full tokens, not single char
-
 
 # In our scanner, all keywords map to TokenKind.NAME with value equal to
 # the keyword string.
