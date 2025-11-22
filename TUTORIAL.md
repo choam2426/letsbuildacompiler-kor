@@ -437,4 +437,16 @@ changes are required.
 
 Note the change in toplevel method of Compiler
 TODO: implement procedures with parameters, using multi-char tokens everywhere.
+Need symbol table with parent links, to push when a new procedure is compiled
+(populated with its formal params), and generate locals for them. The type
+should say global or param, and that's how we know what to emit.
+If we want to allow defining functions after calls, we can't type check the
+call (in a single-pass compiler).
+Have to support locals anyway, since part 13 covers local VAR declarations
+within a procedure (and program).
 
+-----> PLAN: support named params for procedures. Params declared as "ref
+<name>" are passed by address. Also support local variables. For this to work,
+the compiler has to know in the call site which params are refs, so procedures
+have to come before use. Note later that this can be mitigated by multiple
+passes or by forward decls.
