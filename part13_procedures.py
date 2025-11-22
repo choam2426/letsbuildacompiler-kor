@@ -63,6 +63,16 @@ class Token:
     value: str
 
 
+class SymbolType(Enum):
+    VARIABLE = auto()
+    PROCEDURE = auto()
+
+
+@dataclass
+class SymbolTableEntry:
+    type: SymbolType
+
+
 class Compiler:
     # After initialization, the entry point for this compiler is the
     # toplevel() method.
@@ -75,7 +85,7 @@ class Compiler:
         self.indent = 0
         self.loopcount = 0
 
-        self.symtable = set()
+        self.symtable: dict[str, SymbolTableEntry] = {}
 
         self.advance_scanner()
 
@@ -202,10 +212,13 @@ class Compiler:
     def epilog(self):
         self.emit_ln(")")
 
-    def alloc_global(self, name: str):
+    def add_symbol(self, name: str, type: SymbolType):
         if name in self.symtable:
-            self.abort(f"Duplicate global variable {name}")
-        self.symtable.add(name)
+            self.abort(f"Duplicate symbol {name}")
+        self.symtable[name] = SymbolTableEntry(type)
+
+    def alloc_global(self, name: str):
+        self.add_symbol(name, SymbolType.VARIABLE)
         value = "0"
         if self.token.kind == TokenKind.EQUAL:
             self.advance_scanner()
@@ -221,12 +234,7 @@ class Compiler:
 
     def ident(self):
         name = self.match(TokenKind.NAME)
-        if self.token.kind == TokenKind.LPAREN:
-            self.advance_scanner()
-            self.match(TokenKind.RPAREN)
-            self.emit_ln(f"call ${name}")
-        else:
-            self.emit_ln(f"global.get ${name}")
+        self.emit_ln(f"global.get ${name}")
 
     def toplevel(self):
         """Top-level entry point for the compiler.
@@ -275,7 +283,14 @@ class Compiler:
         self.match_name("END")
 
     def procedure(self):
-        raise NotImplementedError("Procedures not implemented yet")
+        self.advance_scanner()
+        name = self.match(TokenKind.NAME)
+        self.emit_ln(f"(func ${name}")
+        self.indent += 2
+        self.block()
+        self.indent -= 2
+        self.emit_ln(")")
+        self.match_name("END")
 
     # <var-list> ::= <var> (, <var> )*
     # <var> ::= <ident> [ = <num> ]
@@ -307,7 +322,7 @@ class Compiler:
             case "BREAK":
                 self.do_break(breakloop_label)
             case _:
-                self.assignment()
+                self.assign_or_proc()
         return False
 
     def block(self, breakloop_label: str = ""):
@@ -317,6 +332,7 @@ class Compiler:
                 break
             self.semi()
 
+    # <proc> ::= <ident> ( )
     # <assignment> ::= <ident> '=' <bool-expression>
     # <expression> ::= <first term> ( <addop> <term> )*
     # <term> ::= <factor> ( <mulop> <factor> )*
@@ -328,11 +344,18 @@ class Compiler:
     # <bool-term> ::= <not-factor> ( <andop> <not-factor> )*
     # <not-factor> ::= [ '!' ] <relation>
     # <relation> ::= <expression> [ <relop> <expression> ]
-    def assignment(self):
+    def assign_or_proc(self):
         name = self.match(TokenKind.NAME)
-        self.match(TokenKind.EQUAL)
-        self.bool_expression()
-        self.emit_assignment(name)
+        if self.token.kind == TokenKind.LPAREN:
+            # Procedure call
+            self.advance_scanner()
+            self.match(TokenKind.RPAREN)
+            self.emit_ln(f"call ${name}")
+        else:
+            # Assignment
+            self.match(TokenKind.EQUAL)
+            self.bool_expression()
+            self.emit_assignment(name)
 
     def emit_assignment(self, name: str):
         if name not in self.symtable:

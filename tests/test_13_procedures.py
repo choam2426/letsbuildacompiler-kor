@@ -15,7 +15,7 @@ class TestCompileAndExecute(unittest.TestCase):
             print("-----------------------------")
         return output.getvalue()
 
-    def compile_and_run_with_io(
+    def compile_and_run(
         self,
         src: str,
         show=False,
@@ -24,7 +24,7 @@ class TestCompileAndExecute(unittest.TestCase):
         return run_wasm(full_code)
 
     def test_comments(self):
-        result = self.compile_and_run_with_io(
+        result = self.compile_and_run(
             """
         var x=8,y,z { a comment }
         program foo
@@ -38,7 +38,7 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 1)
 
-        result = self.compile_and_run_with_io(
+        result = self.compile_and_run(
             """
         var x=8,y=3,z=2 { nested { comments } are ok }
         program foo
@@ -50,7 +50,7 @@ class TestCompileAndExecute(unittest.TestCase):
         self.assertEqual(result, 1)
 
     def test_semicolons(self):
-        result = self.compile_and_run_with_io(
+        result = self.compile_and_run(
             r"""
         var x=0;
         var y=10
@@ -66,7 +66,7 @@ class TestCompileAndExecute(unittest.TestCase):
         self.assertEqual(result, 13)
 
     def test_if_else(self):
-        result = self.compile_and_run_with_io(
+        result = self.compile_and_run(
             r"""
         var x=0,y=10
         program foo
@@ -81,7 +81,7 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 20)
 
-        result = self.compile_and_run_with_io(
+        result = self.compile_and_run(
             r"""
         var x=0,y=10
         program foo
@@ -97,7 +97,7 @@ class TestCompileAndExecute(unittest.TestCase):
         self.assertEqual(result, 30)
 
     def test_while_loop(self):
-        result = self.compile_and_run_with_io(
+        result = self.compile_and_run(
             r"""
         var x=0,y=5
         program somename
@@ -112,7 +112,7 @@ class TestCompileAndExecute(unittest.TestCase):
         self.assertEqual(result, 10)
 
         # Same but with an early break
-        result = self.compile_and_run_with_io(
+        result = self.compile_and_run(
             r"""
         var x=0,y=5
         program othername
@@ -128,6 +128,25 @@ class TestCompileAndExecute(unittest.TestCase):
         """
         )
         self.assertEqual(result, 6)
+
+    def test_procedure_basic(self):
+        result = self.compile_and_run(
+            r"""
+        var X=0
+
+        procedure add5
+            X = X + 5
+        end
+
+        program testprog
+        begin
+            add5()
+            add5()
+            add5()
+        end.
+        """
+        )
+        self.assertEqual(result, 15)
 
 
 if __name__ == "__main__":
