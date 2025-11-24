@@ -278,30 +278,50 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 288)
 
-        # result = self.compile_and_run(
-        #     r"""
-        # var X=0
+    def test_procedure_with_locals_and_loop(self):
+        result = self.compile_and_run(
+            r"""
+            var X=0
 
-        # procedure addseq(n)
-        #     var i=0, sum=0
-        #     begin
-        #         while i < n
-        #             sum = sum + i
-        #             i = i + 1
-        #         end
-        #         X = X + sum
-        #     end
-        # end
+            { sum from 0 to n-1 inclusive, and add to X }
+            procedure addseq(n)
+                var i, sum  { 0 initialized }
+                while i < n
+                    sum = sum + i
+                    i = i + 1
+                end
+                X = X + sum
+            end
 
-        # program testprog
-        # begin
-        #     addseq(5)  { adds 0+1+2+3+4 = 10 }
-        #     addseq(3)  { adds 0+1+2 = 3 }
-        # end
-        # .
-        # """
-        # )
-        # self.assertEqual(result, 13)
+            program testprog
+            begin
+                addseq(10)
+                addseq(5)
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 45 + 10)
+
+    def test_procedure_var_duplicates_param(self):
+        with self.assertRaisesRegex(Exception, "Duplicate"):
+            self.compile_and_run(
+                r"""
+                var X=0
+
+                procedure aproc(y, z)
+                    var y, t;
+                    y = 2
+                    X = X + y
+                end
+
+                program testprog
+                begin
+                    aproc(5,10)
+                end
+            .
+            """
+            )
 
 
 if __name__ == "__main__":

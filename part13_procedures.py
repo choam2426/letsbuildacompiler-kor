@@ -350,7 +350,6 @@ class Compiler:
 
         # Process local declarations
         while self.token_is_name("VAR"):
-
             self.decl(is_global=False)
             self.semi()
 
