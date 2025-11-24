@@ -1,3 +1,4 @@
+from __future__ import annotations
 from enum import Enum, auto
 from dataclasses import dataclass
 from typing import TextIO
@@ -63,14 +64,29 @@ class Token:
     value: str
 
 
-class SymbolType(Enum):
-    VARIABLE = auto()
-    PROCEDURE = auto()
+# Types for our symbol table entries.
+@dataclass
+class GlobalVar:
+    pass
 
 
 @dataclass
-class SymbolTableEntry:
-    type: SymbolType
+class LocalVar:
+    pass
+
+
+@dataclass
+class Procedure:
+    pass
+
+
+SymbolTableEntry = GlobalVar | LocalVar | Procedure
+
+
+@dataclass
+class SymbolTable:
+    entries: dict[str, SymbolTableEntry]
+    parent: SymbolTable | None = None
 
 
 class Compiler:
@@ -85,7 +101,7 @@ class Compiler:
         self.indent = 0
         self.loopcount = 0
 
-        self.symtable: dict[str, SymbolTableEntry] = {}
+        self.symtable = SymbolTable(entries={})
 
         self.advance_scanner()
 
@@ -212,13 +228,13 @@ class Compiler:
     def epilog(self):
         self.emit_ln(")")
 
-    def add_symbol(self, name: str, type: SymbolType):
-        if name in self.symtable:
+    def add_symbol(self, name: str, entry: SymbolTableEntry):
+        if name in self.symtable.entries:
             self.abort(f"Duplicate symbol {name}")
-        self.symtable[name] = SymbolTableEntry(type)
+        self.symtable.entries[name] = entry
 
     def alloc_global(self, name: str):
-        self.add_symbol(name, SymbolType.VARIABLE)
+        self.add_symbol(name, GlobalVar())
         value = "0"
         if self.token.kind == TokenKind.EQUAL:
             self.advance_scanner()
@@ -358,7 +374,7 @@ class Compiler:
             self.emit_assignment(name)
 
     def emit_assignment(self, name: str):
-        if name not in self.symtable:
+        if name not in self.symtable.entries:
             self.undefined(name)
         self.emit_ln(f"global.set ${name}")
 
