@@ -5,7 +5,7 @@ from part13_procedures import Compiler
 
 
 class TestCompileAndExecute(unittest.TestCase):
-    def _compile_to_wasm(self, src: str, show=False) -> str:
+    def compile_to_wasm(self, src: str, show=False) -> str:
         output = io.StringIO()
         compiler = Compiler(src, output=output)
         compiler.toplevel()
@@ -20,7 +20,7 @@ class TestCompileAndExecute(unittest.TestCase):
         src: str,
         show=False,
     ) -> int:
-        full_code = self._compile_to_wasm(src, show=show)
+        full_code = self.compile_to_wasm(src, show=show)
         return run_wasm(full_code)
 
     def test_comments(self):
@@ -195,6 +195,113 @@ class TestCompileAndExecute(unittest.TestCase):
         """
         )
         self.assertEqual(result, 66)
+
+    def test_procedure_not_enough_params(self):
+        with self.assertRaisesRegex(Exception, "expects 1 parameters, got 0"):
+            self.compile_and_run(
+                r"""
+            var X=0
+
+            procedure addtox(addend)
+                X = addend + X
+            end
+
+            program testprog
+            begin
+                addtox()
+            end
+            .
+            """
+            )
+
+    def test_procedure_too_many_params(self):
+        with self.assertRaisesRegex(Exception, "expects 1 parameters, got 2"):
+            self.compile_and_run(
+                r"""
+            var X=0
+
+            procedure addtox(addend)
+                X = addend + X
+            end
+
+            program testprog
+            begin
+                addtox(5, 10)
+            end
+            .
+            """
+            )
+
+    def test_procedure_with_local_vars(self):
+        result = self.compile_and_run(
+            r"""
+            var X=0
+
+            procedure aproc()
+                var y, z, t;
+                y = 2
+                z = 13
+                t = 17
+                X = X + y + z + t
+            end
+
+            program testprog
+            begin
+                aproc()
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 32)
+
+    def test_procedure_local_shadows_global(self):
+        result = self.compile_and_run(
+            r"""
+            var X=0
+            var y=9
+
+            procedure aproc()
+                var y, z, t;
+                y = 2
+                z = 13
+                t = 17
+                X = X + y + z + t
+            end
+
+            program testprog
+            begin
+                aproc()
+                x = x * y  { uses global y=9 }
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 288)
+
+        # result = self.compile_and_run(
+        #     r"""
+        # var X=0
+
+        # procedure addseq(n)
+        #     var i=0, sum=0
+        #     begin
+        #         while i < n
+        #             sum = sum + i
+        #             i = i + 1
+        #         end
+        #         X = X + sum
+        #     end
+        # end
+
+        # program testprog
+        # begin
+        #     addseq(5)  { adds 0+1+2+3+4 = 10 }
+        #     addseq(3)  { adds 0+1+2 = 3 }
+        # end
+        # .
+        # """
+        # )
+        # self.assertEqual(result, 13)
 
 
 if __name__ == "__main__":

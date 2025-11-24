@@ -241,17 +241,21 @@ class Compiler:
             self.abort(f"Duplicate symbol {name}")
         self.symtable.entries[name] = entry
 
-    def alloc_global(self, name: str):
-        self.add_symbol(name, GlobalVar())
-        value = "0"
-        if self.token.kind == TokenKind.EQUAL:
-            self.advance_scanner()
-            if self.token.kind == TokenKind.SUB:
+    def alloc_var(self, name: str, is_global: bool):
+        if is_global:
+            value = "0"
+            if self.token.kind == TokenKind.EQUAL:
                 self.advance_scanner()
-                value = "-" + self.match(TokenKind.NUMBER)
-            else:
-                value = self.match(TokenKind.NUMBER)
-        self.emit_ln(f"(global ${name} (mut i32) (i32.const {value}))")
+                if self.token.kind == TokenKind.SUB:
+                    self.advance_scanner()
+                    value = "-" + self.match(TokenKind.NUMBER)
+                else:
+                    value = self.match(TokenKind.NUMBER)
+            self.add_symbol(name, GlobalVar())
+            self.emit_ln(f"(global ${name} (mut i32) (i32.const {value}))")
+        else:
+            self.add_symbol(name, LocalVar(ref=False))
+            self.emit_ln(f"(local ${name} i32)")
 
     def undefined(self, name: str):
         self.abort(f"Undefined identifier {name}")
@@ -292,7 +296,7 @@ class Compiler:
                 self.expected("a top-level declaration")
             match self.token.value:
                 case "VAR":
-                    self.decl()
+                    self.decl(is_global=True)
                     self.semi()
                 case "PROCEDURE":
                     self.procedure()
@@ -343,7 +347,15 @@ class Compiler:
         params_str = " ".join(f"(param ${p[0]} i32)" for p in params)
         self.emit_ln(f"(func ${name} {params_str}")
         self.indent += 2
+
+        # Process local declarations
+        while self.token_is_name("VAR"):
+
+            self.decl(is_global=False)
+            self.semi()
+
         self.block()
+
         self.indent -= 2
         self.emit_ln(")")
         self.match_name("END")
@@ -363,12 +375,12 @@ class Compiler:
 
     # <var-list> ::= <var> (, <var> )*
     # <var> ::= <ident> [ = <num> ]
-    def decl(self):
+    def decl(self, is_global: bool):
         self.match_name("VAR")
-        self.alloc_global(self.match(TokenKind.NAME))
+        self.alloc_var(self.match(TokenKind.NAME), is_global=is_global)
         while self.token.kind == TokenKind.COMMA:
             self.advance_scanner()
-            self.alloc_global(self.match(TokenKind.NAME))
+            self.alloc_var(self.match(TokenKind.NAME), is_global=is_global)
 
     # <if> ::= IF <bool-expression> <block> [ ELSE <block>] END
     # <while> ::= WHILE <bool-expression> <block> END
@@ -417,10 +429,6 @@ class Compiler:
         name = self.match(TokenKind.NAME)
         if self.token.kind == TokenKind.LPAREN:
             self.procedure_call(name)
-            # Procedure call
-            # self.advance_scanner()
-            # self.match(TokenKind.RPAREN)
-            # self.emit_ln(f"call ${name}")
         else:
             # Assignment
             self.match(TokenKind.EQUAL)

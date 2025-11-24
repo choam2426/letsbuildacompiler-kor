@@ -444,6 +444,7 @@ If we want to allow defining functions after calls, we can't type check the
 call (in a single-pass compiler).
 Have to support locals anyway, since part 13 covers local VAR declarations
 within a procedure (and program).
+Mention difficulties with not having some tree / IR
 
 -----> PLAN: support named params for procedures. Params declared as "ref
 <name>" are passed by address. Also support local variables. For this to work,
