@@ -72,12 +72,12 @@ class GlobalVar:
 
 @dataclass
 class LocalVar:
-    pass
+    ref: bool
 
 
 @dataclass
 class Procedure:
-    pass
+    params: list[tuple[str, LocalVar]]
 
 
 SymbolTableEntry = GlobalVar | LocalVar | Procedure
@@ -177,6 +177,14 @@ class Compiler:
         else:
             return False
 
+    def lookup_symbol(self, name: str) -> SymbolTableEntry | None:
+        table = self.symtable
+        while table is not None:
+            if name in table.entries:
+                return table.entries[name]
+            table = table.parent
+        return None
+
     def abort(self, msg: str):
         raise Exception(f"Error: {msg}")
 
@@ -250,7 +258,18 @@ class Compiler:
 
     def ident(self):
         name = self.match(TokenKind.NAME)
-        self.emit_ln(f"global.get ${name}")
+        entry = self.lookup_symbol(name)
+        match entry:
+            case None:
+                self.undefined(name)
+            case LocalVar(ref=True):
+                self.emit_ln("TODO LOAD")
+            case LocalVar(ref=False):
+                self.emit_ln(f"local.get ${name}")
+            case GlobalVar():
+                self.emit_ln(f"global.get ${name}")
+            case _:
+                self.abort(f"Cannot refer to {name}")
 
     def toplevel(self):
         """Top-level entry point for the compiler.
@@ -301,12 +320,46 @@ class Compiler:
     def procedure(self):
         self.advance_scanner()
         name = self.match(TokenKind.NAME)
-        self.emit_ln(f"(func ${name}")
+
+        # Collect parameters
+        self.match(TokenKind.LPAREN)
+        params = []
+        if self.token.kind != TokenKind.RPAREN:
+            param = self.procedure_param()
+            params.append(param)
+            while self.token.kind == TokenKind.COMMA:
+                self.advance_scanner()
+                param = self.procedure_param()
+                params.append(param)
+        self.match(TokenKind.RPAREN)
+
+        # Add procedure to symbol table
+        self.add_symbol(name, Procedure(params=params))
+
+        # Push frame onto symtable with parameters
+        new_entries = {p[0]: p[1] for p in params}
+        self.symtable = SymbolTable(entries=new_entries, parent=self.symtable)
+
+        params_str = " ".join(f"(param ${p[0]} i32)" for p in params)
+        self.emit_ln(f"(func ${name} {params_str}")
         self.indent += 2
         self.block()
         self.indent -= 2
         self.emit_ln(")")
         self.match_name("END")
+
+        # Pop frame from symtable
+        assert self.symtable.parent is not None
+        self.symtable = self.symtable.parent
+
+    # <procedure-param> ::= [ 'ref' ] <ident>
+    def procedure_param(self) -> tuple[str, LocalVar]:
+        ref_or_name = self.match(TokenKind.NAME)
+        if ref_or_name == "ref":
+            name = self.match(TokenKind.NAME)
+            return name, LocalVar(ref=True)
+        else:
+            return ref_or_name, LocalVar(ref=False)
 
     # <var-list> ::= <var> (, <var> )*
     # <var> ::= <ident> [ = <num> ]
@@ -363,20 +416,57 @@ class Compiler:
     def assign_or_proc(self):
         name = self.match(TokenKind.NAME)
         if self.token.kind == TokenKind.LPAREN:
+            self.procedure_call(name)
             # Procedure call
-            self.advance_scanner()
-            self.match(TokenKind.RPAREN)
-            self.emit_ln(f"call ${name}")
+            # self.advance_scanner()
+            # self.match(TokenKind.RPAREN)
+            # self.emit_ln(f"call ${name}")
         else:
             # Assignment
             self.match(TokenKind.EQUAL)
             self.bool_expression()
             self.emit_assignment(name)
 
+    def procedure_call(self, name: str):
+        self.match(TokenKind.LPAREN)
+        entry = self.lookup_symbol(name)
+        match entry:
+            # TODO: handle ref params
+            case Procedure(params=params):
+                if self.token.kind == TokenKind.RPAREN:
+                    if len(params) != 0:
+                        self.abort(
+                            f"Procedure {name} expects {len(params)} parameters, got 0"
+                        )
+                else:
+                    nparam = 0
+                    self.expression()
+                    while self.token.kind == TokenKind.COMMA:
+                        self.advance_scanner()
+                        nparam += 1
+                        self.expression()
+                    if nparam + 1 != len(params):
+                        self.abort(
+                            f"Procedure {name} expects {len(params)} parameters, got {nparam + 1}"
+                        )
+                self.match(TokenKind.RPAREN)
+            case _:
+                self.abort(f"Undefined procedure {name}")
+        self.emit_ln(f"call ${name}")
+
     def emit_assignment(self, name: str):
-        if name not in self.symtable.entries:
-            self.undefined(name)
-        self.emit_ln(f"global.set ${name}")
+        entry = self.lookup_symbol(name)
+        match entry:
+            case None:
+                self.undefined(name)
+            case LocalVar(ref=True):
+                self.emit_ln("TODO STORE")
+            case LocalVar(ref=False):
+                self.emit_ln(f"local.set ${name}")
+            case GlobalVar():
+                self.emit_ln(f"global.set ${name}")
+            case _:
+                self.abort(f"Cannot assign to {name}")
 
     def factor(self):
         if self.token.kind == TokenKind.LPAREN:

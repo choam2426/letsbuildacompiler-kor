@@ -134,7 +134,7 @@ class TestCompileAndExecute(unittest.TestCase):
             r"""
         var X=0
 
-        procedure add5
+        procedure add5()
             X = X + 5
         end
 
@@ -154,26 +154,47 @@ class TestCompileAndExecute(unittest.TestCase):
             r"""
         var X=0
 
-        { Also show that procedures can be defined after use }
+        procedure add5()
+            X = X + 5
+        end
+
+        procedure add10()
+            add5()
+            add5()
+        end
+
         program testprog
         begin
             add10()
             add10()
             add10()
         end
-
-        procedure add5
-            X = X + 5
-        end
-
-        procedure add10
-            add5()
-            add5()
-        end
         .
         """
         )
         self.assertEqual(result, 30)
+
+    def test_procedure_params(self):
+        result = self.compile_and_run(
+            r"""
+        var X=0
+        var y=0
+
+        procedure addtox(addend)
+            X = addend + X
+        end
+
+        program testprog
+        begin
+            addtox(6)
+            y = 10
+            addtox(y*2)
+            addtox(y+30)
+        end
+        .
+        """
+        )
+        self.assertEqual(result, 66)
 
 
 if __name__ == "__main__":
