@@ -426,6 +426,35 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 407)
 
+    def test_procedure_calls_procedure_with_ref(self):
+        result = self.compile_and_run(
+            r"""
+            var X=0
+            var Y=6
+
+            procedure add(ref value, addend)
+                value = value + addend
+            end
+
+            procedure multiply(ref value, factor)
+                value = value * factor
+            end
+
+            procedure process(a, f, ref value)
+                add(value, a)
+                multiply(value, f)
+            end
+
+            program testprog
+            begin
+                process(4, 2, Y)      { Y = (6 + 4) * 2 = 20 }
+                X = Y * Y
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 400)
+
 
 if __name__ == "__main__":
     unittest.main()

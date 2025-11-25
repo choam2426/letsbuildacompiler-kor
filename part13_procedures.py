@@ -269,7 +269,7 @@ class Compiler:
     def undefined(self, name: str):
         self.abort(f"Undefined identifier {name}")
 
-    def ident(self) -> NamedEntry:
+    def ident(self):
         name = self.match(TokenKind.NAME)
         entry = self.lookup_symbol(name)
         match entry:
@@ -284,8 +284,6 @@ class Compiler:
                 self.emit_ln(f"global.get ${name}")
             case _:
                 self.abort(f"Cannot refer to {name}")
-        assert entry is not None
-        return NamedEntry(name, entry)
 
     def toplevel(self):
         """Top-level entry point for the compiler.
@@ -461,22 +459,44 @@ class Compiler:
                     nparam = 0
                     while True:
                         if nparam < len(params) and params[nparam].entry.ref:
-                            param_entry = self.ident()
-                            self.emit_ln(f";; parameter {params[nparam].name} by ref")
-                            self.emit_ln("global.get $__sp      ;; make space on stack")
-                            self.emit_ln("i32.const 4")
-                            self.emit_ln("i32.sub")
-                            self.emit_ln("global.set $__sp")
-                            # Store the parameter value at sp
-                            self.emit_ln("global.set $__tmp     ;; store parameter")
-                            self.emit_ln("global.get $__sp")
-                            self.emit_ln("global.get $__tmp")
-                            self.emit_ln("i32.store")
-                            # Push the address (sp) as the parameter
-                            self.emit_ln(
-                                "global.get $__sp      ;; push address as parameter"
-                            )
-                            ref_entries.append(param_entry)
+                            param_name = self.match(TokenKind.NAME)
+                            entry = self.lookup_symbol(param_name)
+                            need_store = True
+                            match entry:
+                                case None:
+                                    self.undefined(param_name)
+                                case LocalVar(ref=True):
+                                    self.emit_ln(f"local.get ${param_name}")
+                                    need_store = False
+                                case LocalVar(ref=False):
+                                    self.emit_ln(f"local.get ${param_name}")
+                                case GlobalVar():
+                                    self.emit_ln(f"global.get ${param_name}")
+                                case _:
+                                    self.abort(f"Cannot refer to {param_name}")
+                            assert entry is not None
+                            param_entry = NamedEntry(param_name, entry)
+
+                            if need_store:
+                                self.emit_ln(
+                                    f";; parameter {params[nparam].name} by ref"
+                                )
+                                self.emit_ln(
+                                    "global.get $__sp      ;; make space on stack"
+                                )
+                                self.emit_ln("i32.const 4")
+                                self.emit_ln("i32.sub")
+                                self.emit_ln("global.set $__sp")
+                                # Store the parameter value at sp
+                                self.emit_ln("global.set $__tmp     ;; store parameter")
+                                self.emit_ln("global.get $__sp")
+                                self.emit_ln("global.get $__tmp")
+                                self.emit_ln("i32.store")
+                                # Push the address (sp) as the parameter
+                                self.emit_ln(
+                                    "global.get $__sp      ;; push address as parameter"
+                                )
+                                ref_entries.append(param_entry)
                         else:
                             self.expression()
                         nparam += 1
