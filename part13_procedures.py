@@ -444,6 +444,7 @@ class Compiler:
             self.bool_expression()
             self.emit_assignment(name)
 
+    # <proc call> ::= <ident> ( [ <call-param> ( , <call-param> )* ] )
     def procedure_call(self, name: str):
         self.match(TokenKind.LPAREN)
         entry = self.lookup_symbol(name)
@@ -456,58 +457,7 @@ class Compiler:
                             f"Procedure {name} expects {len(params)} parameters, got 0"
                         )
                 else:
-                    nparam = 0
-                    while True:
-                        if nparam < len(params) and params[nparam].entry.ref:
-                            param_name = self.match(TokenKind.NAME)
-                            entry = self.lookup_symbol(param_name)
-                            need_store = True
-                            match entry:
-                                case None:
-                                    self.undefined(param_name)
-                                case LocalVar(ref=True):
-                                    self.emit_ln(f"local.get ${param_name}")
-                                    need_store = False
-                                case LocalVar(ref=False):
-                                    self.emit_ln(f"local.get ${param_name}")
-                                case GlobalVar():
-                                    self.emit_ln(f"global.get ${param_name}")
-                                case _:
-                                    self.abort(f"Cannot refer to {param_name}")
-                            assert entry is not None
-                            param_entry = NamedEntry(param_name, entry)
-
-                            if need_store:
-                                self.emit_ln(
-                                    f";; parameter {params[nparam].name} by ref"
-                                )
-                                self.emit_ln(
-                                    "global.get $__sp      ;; make space on stack"
-                                )
-                                self.emit_ln("i32.const 4")
-                                self.emit_ln("i32.sub")
-                                self.emit_ln("global.set $__sp")
-                                # Store the parameter value at sp
-                                self.emit_ln("global.set $__tmp     ;; store parameter")
-                                self.emit_ln("global.get $__sp")
-                                self.emit_ln("global.get $__tmp")
-                                self.emit_ln("i32.store")
-                                # Push the address (sp) as the parameter
-                                self.emit_ln(
-                                    "global.get $__sp      ;; push address as parameter"
-                                )
-                                ref_entries.append(param_entry)
-                        else:
-                            self.expression()
-                        nparam += 1
-                        if self.token.kind == TokenKind.COMMA:
-                            self.advance_scanner()
-                        else:
-                            break
-                    if nparam != len(params):
-                        self.abort(
-                            f"Procedure {name} expects {len(params)} parameters, got {nparam}"
-                        )
+                    ref_entries.extend(self.call_argument(name, params))
                 self.match(TokenKind.RPAREN)
             case _:
                 self.abort(f"Undefined procedure {name}")
@@ -530,6 +480,68 @@ class Compiler:
             self.emit_ln(f"i32.const {len(ref_entries) * 4}")
             self.emit_ln("i32.add")
             self.emit_ln("global.set $__sp")
+
+    # Process a single argument to a call. Note that there is syntax table
+    # dependent parsing here: for ref parameters we expect a variable name,
+    # and for other parameters we accept arbitrary expressions.
+    #
+    # Returns a list of NamedEntry for parameters passed by reference that
+    # need to be restored from the stack after the call.
+    def call_argument(
+        self, procname: str, proc_params: list[NamedEntry]
+    ) -> list[NamedEntry]:
+        ref_entries = []
+        nparam = 0
+        while True:
+            if nparam < len(proc_params) and proc_params[nparam].entry.ref:
+                param_name = self.match(TokenKind.NAME)
+                entry = self.lookup_symbol(param_name)
+
+                # For arguments that are themselves reference parameters, we
+                # just pass the reference along - there's no need to load/store
+                # the value from/to the stack.
+                need_store = True
+                match entry:
+                    case None:
+                        self.undefined(param_name)
+                    case LocalVar(ref=True):
+                        self.emit_ln(f"local.get ${param_name}")
+                        need_store = False
+                    case LocalVar(ref=False):
+                        self.emit_ln(f"local.get ${param_name}")
+                    case GlobalVar():
+                        self.emit_ln(f"global.get ${param_name}")
+                    case _:
+                        self.abort(f"Cannot refer to {param_name}")
+                assert entry is not None
+                param_entry = NamedEntry(param_name, entry)
+
+                if need_store:
+                    self.emit_ln(f";; parameter {proc_params[nparam].name} by ref")
+                    self.emit_ln("global.get $__sp      ;; make space on stack")
+                    self.emit_ln("i32.const 4")
+                    self.emit_ln("i32.sub")
+                    self.emit_ln("global.set $__sp")
+                    # Store the parameter value at sp
+                    self.emit_ln("global.set $__tmp     ;; store parameter")
+                    self.emit_ln("global.get $__sp")
+                    self.emit_ln("global.get $__tmp")
+                    self.emit_ln("i32.store")
+                    # Push the address (sp) as the parameter
+                    self.emit_ln("global.get $__sp      ;; push address as parameter")
+                    ref_entries.append(param_entry)
+            else:
+                self.expression()
+            nparam += 1
+            if self.token.kind == TokenKind.COMMA:
+                self.advance_scanner()
+            else:
+                break
+        if nparam != len(proc_params):
+            self.abort(
+                f"Procedure {procname} expects {len(proc_params)} parameters, got {nparam}"
+            )
+        return ref_entries
 
     def emit_assignment(self, name: str):
         entry = self.lookup_symbol(name)
