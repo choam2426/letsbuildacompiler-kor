@@ -323,6 +323,26 @@ class TestCompileAndExecute(unittest.TestCase):
             """
             )
 
+    def test_procedure_byref(self):
+        result = self.compile_and_run(
+            r"""
+            var X=4
+            var Y=9
+
+            procedure addtox(ref addend)
+                X = X + addend
+            end
+
+            program testprog
+            begin
+                addtox(Y)
+            end
+            .
+            """,
+            show=True,
+        )
+        self.assertEqual(result, 13)
+
 
 if __name__ == "__main__":
     unittest.main()

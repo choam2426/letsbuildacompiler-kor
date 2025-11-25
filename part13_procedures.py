@@ -77,10 +77,16 @@ class LocalVar:
 
 @dataclass
 class Procedure:
-    params: list[tuple[str, LocalVar]]
+    params: list[NamedEntry]
 
 
 SymbolTableEntry = GlobalVar | LocalVar | Procedure
+
+
+@dataclass
+class NamedEntry:
+    name: str
+    entry: SymbolTableEntry
 
 
 @dataclass
@@ -232,6 +238,9 @@ class Compiler:
 
     def prolog(self):
         self.emit_ln("(module")
+        self.emit_ln("  (memory 8)")
+        self.emit_ln("  (global $__sp (mut i32) (i32.const 65536))")
+        self.emit_ln("  (global $__tmp (mut i32) (i32.const 0))")
 
     def epilog(self):
         self.emit_ln(")")
@@ -260,20 +269,22 @@ class Compiler:
     def undefined(self, name: str):
         self.abort(f"Undefined identifier {name}")
 
-    def ident(self):
+    def ident(self) -> NamedEntry:
         name = self.match(TokenKind.NAME)
         entry = self.lookup_symbol(name)
         match entry:
             case None:
                 self.undefined(name)
             case LocalVar(ref=True):
-                self.emit_ln("TODO LOAD")
+                self.emit_ln(f"local.get ${name}")
+                self.emit_ln("i32.load")
             case LocalVar(ref=False):
                 self.emit_ln(f"local.get ${name}")
             case GlobalVar():
                 self.emit_ln(f"global.get ${name}")
             case _:
                 self.abort(f"Cannot refer to {name}")
+        return NamedEntry(name, entry)
 
     def toplevel(self):
         """Top-level entry point for the compiler.
@@ -341,10 +352,10 @@ class Compiler:
         self.add_symbol(name, Procedure(params=params))
 
         # Push frame onto symtable with parameters
-        new_entries = {p[0]: p[1] for p in params}
+        new_entries = {p.name: p.entry for p in params}
         self.symtable = SymbolTable(entries=new_entries, parent=self.symtable)
 
-        params_str = " ".join(f"(param ${p[0]} i32)" for p in params)
+        params_str = " ".join(f"(param ${p.name} i32)" for p in params)
         self.emit_ln(f"(func ${name} {params_str}")
         self.indent += 2
 
@@ -364,13 +375,13 @@ class Compiler:
         self.symtable = self.symtable.parent
 
     # <procedure-param> ::= [ 'ref' ] <ident>
-    def procedure_param(self) -> tuple[str, LocalVar]:
+    def procedure_param(self) -> NamedEntry:
         ref_or_name = self.match(TokenKind.NAME)
-        if ref_or_name == "ref":
+        if ref_or_name == "REF":
             name = self.match(TokenKind.NAME)
-            return name, LocalVar(ref=True)
+            return NamedEntry(name, LocalVar(ref=True))
         else:
-            return ref_or_name, LocalVar(ref=False)
+            return NamedEntry(ref_or_name, LocalVar(ref=False))
 
     # <var-list> ::= <var> (, <var> )*
     # <var> ::= <ident> [ = <num> ]
@@ -437,8 +448,8 @@ class Compiler:
     def procedure_call(self, name: str):
         self.match(TokenKind.LPAREN)
         entry = self.lookup_symbol(name)
+        ref_entries = []  # TODO comments
         match entry:
-            # TODO: handle ref params
             case Procedure(params=params):
                 if self.token.kind == TokenKind.RPAREN:
                     if len(params) != 0:
@@ -447,19 +458,53 @@ class Compiler:
                         )
                 else:
                     nparam = 0
-                    self.expression()
-                    while self.token.kind == TokenKind.COMMA:
-                        self.advance_scanner()
+                    while True:
+                        if nparam < len(params) and params[nparam].entry.ref:
+                            param_entry = self.ident()
+                            # Decrement sp to allocate space
+                            self.emit_ln("global.get $__sp")
+                            self.emit_ln("i32.const 4")
+                            self.emit_ln("i32.sub")
+                            self.emit_ln("global.set $__sp")
+                            # Store the parameter value at sp
+                            self.emit_ln("global.set $__tmp")
+                            self.emit_ln("global.get $__sp")
+                            self.emit_ln("global.get $__tmp")
+                            self.emit_ln("i32.store")
+                            # Push the address (sp) as the parameter
+                            self.emit_ln("global.get $__sp")
+                            ref_entries.append(param_entry)
+                        else:
+                            self.expression()
                         nparam += 1
-                        self.expression()
-                    if nparam + 1 != len(params):
+                        if self.token.kind == TokenKind.COMMA:
+                            self.advance_scanner()
+                        else:
+                            break
+                    if nparam != len(params):
                         self.abort(
-                            f"Procedure {name} expects {len(params)} parameters, got {nparam + 1}"
+                            f"Procedure {name} expects {len(params)} parameters, got {nparam}"
                         )
                 self.match(TokenKind.RPAREN)
             case _:
                 self.abort(f"Undefined procedure {name}")
         self.emit_ln(f"call ${name}")
+        if len(ref_entries) > 0:
+            for i, entry in enumerate(reversed(ref_entries)):
+                # Store the reference parameters back into their
+                # variables.
+                self.emit_ln(f"global.get $__sp")
+                self.emit_ln(f"i32.load offset={i * 4}")
+                if isinstance(entry.entry, LocalVar):
+                    self.emit_ln(f"local.set ${entry.name}")
+                elif isinstance(entry.entry, GlobalVar):
+                    self.emit_ln(f"global.set ${entry.name}")
+                else:
+                    self.abort("Invalid reference parameter")
+            self.emit_ln(f"global.get $__sp")
+            self.emit_ln(f"i32.const {len(ref_entries) * 4}")
+            self.emit_ln("i32.add")
+            self.emit_ln(f"global.set $__sp")
 
     def emit_assignment(self, name: str):
         entry = self.lookup_symbol(name)
@@ -467,7 +512,13 @@ class Compiler:
             case None:
                 self.undefined(name)
             case LocalVar(ref=True):
-                self.emit_ln("TODO STORE")
+                # We currently have the value at TOS, but we need the address
+                # below it. Use $__tmp to set the stack in the right order
+                # for storing.
+                self.emit_ln(f"global.set $__tmp")
+                self.emit_ln(f"local.get ${name}")
+                self.emit_ln(f"global.get $__tmp")
+                self.emit_ln("i32.store")
             case LocalVar(ref=False):
                 self.emit_ln(f"local.set ${name}")
             case GlobalVar():
