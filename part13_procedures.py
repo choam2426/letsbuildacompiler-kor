@@ -284,6 +284,7 @@ class Compiler:
                 self.emit_ln(f"global.get ${name}")
             case _:
                 self.abort(f"Cannot refer to {name}")
+        assert entry is not None
         return NamedEntry(name, entry)
 
     def toplevel(self):
@@ -448,7 +449,7 @@ class Compiler:
     def procedure_call(self, name: str):
         self.match(TokenKind.LPAREN)
         entry = self.lookup_symbol(name)
-        ref_entries = []  # TODO comments
+        ref_entries = []
         match entry:
             case Procedure(params=params):
                 if self.token.kind == TokenKind.RPAREN:
@@ -461,18 +462,20 @@ class Compiler:
                     while True:
                         if nparam < len(params) and params[nparam].entry.ref:
                             param_entry = self.ident()
-                            # Decrement sp to allocate space
-                            self.emit_ln("global.get $__sp")
+                            self.emit_ln(f";; parameter {params[nparam].name} by ref")
+                            self.emit_ln("global.get $__sp      ;; make space on stack")
                             self.emit_ln("i32.const 4")
                             self.emit_ln("i32.sub")
                             self.emit_ln("global.set $__sp")
                             # Store the parameter value at sp
-                            self.emit_ln("global.set $__tmp")
+                            self.emit_ln("global.set $__tmp     ;; store parameter")
                             self.emit_ln("global.get $__sp")
                             self.emit_ln("global.get $__tmp")
                             self.emit_ln("i32.store")
                             # Push the address (sp) as the parameter
-                            self.emit_ln("global.get $__sp")
+                            self.emit_ln(
+                                "global.get $__sp      ;; push address as parameter"
+                            )
                             ref_entries.append(param_entry)
                         else:
                             self.expression()
@@ -493,7 +496,8 @@ class Compiler:
             for i, entry in enumerate(reversed(ref_entries)):
                 # Store the reference parameters back into their
                 # variables.
-                self.emit_ln(f"global.get $__sp")
+                self.emit_ln(f";; restore parameter {entry.name} by ref")
+                self.emit_ln("global.get $__sp")
                 self.emit_ln(f"i32.load offset={i * 4}")
                 if isinstance(entry.entry, LocalVar):
                     self.emit_ln(f"local.set ${entry.name}")
@@ -501,10 +505,11 @@ class Compiler:
                     self.emit_ln(f"global.set ${entry.name}")
                 else:
                     self.abort("Invalid reference parameter")
-            self.emit_ln(f"global.get $__sp")
+            self.emit_ln(";; clean up stack for ref parameters")
+            self.emit_ln("global.get $__sp")
             self.emit_ln(f"i32.const {len(ref_entries) * 4}")
             self.emit_ln("i32.add")
-            self.emit_ln(f"global.set $__sp")
+            self.emit_ln("global.set $__sp")
 
     def emit_assignment(self, name: str):
         entry = self.lookup_symbol(name)
@@ -515,9 +520,9 @@ class Compiler:
                 # We currently have the value at TOS, but we need the address
                 # below it. Use $__tmp to set the stack in the right order
                 # for storing.
-                self.emit_ln(f"global.set $__tmp")
+                self.emit_ln("global.set $__tmp")
                 self.emit_ln(f"local.get ${name}")
-                self.emit_ln(f"global.get $__tmp")
+                self.emit_ln("global.get $__tmp")
                 self.emit_ln("i32.store")
             case LocalVar(ref=False):
                 self.emit_ln(f"local.set ${name}")

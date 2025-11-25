@@ -338,10 +338,93 @@ class TestCompileAndExecute(unittest.TestCase):
                 addtox(Y)
             end
             .
-            """,
-            show=True,
+            """
         )
         self.assertEqual(result, 13)
+
+        # one by-value, one by-ref
+        result = self.compile_and_run(
+            r"""
+            var X=4
+            var Y=9
+
+            procedure addtox(addend1, ref addend2)
+                X = X + addend1 + addend2
+            end
+
+            program testprog
+            begin
+                addtox(4+5, Y)
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 22)
+
+        # two by-ref
+        result = self.compile_and_run(
+            r"""
+            var X=4
+            var Y=9, Z=14;
+
+            procedure addtox(ref addend1, ref addend2)
+                X = X + addend1 + addend2
+            end
+
+            program testprog
+            begin
+                addtox(Y, Z)
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 27)
+
+    def test_procedure_byref_modifies_caller(self):
+        result = self.compile_and_run(
+            r"""
+            var X=4
+            var Y=9
+
+            procedure addandmodify(ref addend)
+                X = X + addend
+                addend = addend + 5
+            end
+
+            program testprog
+            begin
+                addandmodify(Y)
+                addandmodify(Y)
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 4 + 9 + 14)
+
+    def test_procedure_divmod(self):
+        result = self.compile_and_run(
+            r"""
+            var X=0
+            var Y=0
+            var Q=0
+            var R=0
+
+            procedure divmod(dividend, divisor, ref quotient, ref remainder)
+                quotient = dividend / divisor
+                remainder = dividend - (quotient * divisor)
+            end
+
+            program testprog
+            begin
+                X = 99
+                Y = 23
+                divmod(X, Y, Q, R)   { quot: 4, rem: 7 }
+                X = 100*Q + R
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 407)
 
 
 if __name__ == "__main__":
