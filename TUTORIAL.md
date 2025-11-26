@@ -435,18 +435,80 @@ changes are required.
 
 ## Part 13: Procedures
 
-Note the change in toplevel method of Compiler
-Need symbol table with parent links, to push when a new procedure is compiled
-(populated with its formal params), and generate locals for them. The type
-should say global or param, and that's how we know what to emit.
-If we want to allow defining functions after calls, we can't type check the
-call (in a single-pass compiler).
-Have to support locals anyway, since part 13 covers local VAR declarations
-within a procedure (and program).
-Mention difficulties with not having some tree / IR
+This part is a significant jump in functionality and complexity, as it adds
+procedures with by-value and by-reference parameters. What we have now is
+resembling a real programming language:
 
------> PLAN: support named params for procedures. Params declared as "ref
-<name>" are passed by address. Also support local variables. For this to work,
-the compiler has to know in the call site which params are refs, so procedures
-have to come before use. Note later that this can be mitigated by multiple
-passes or by forward decls.
+```
+procedure divmod(dividend, divisor, ref quotient, ref remainder)
+    quotient = dividend / divisor
+    remainder = dividend - (quotient * divisor)
+end
+```
+
+(we support multi-character tokens)
+
+The original tutorial goes back and forth between passing parameters to value
+and reference; I've decided to support both, for maximal flexibility. A `ref`
+prefix token in the parameter declaration implies a by-ref parameter, otherwise
+it's by-value.
+
+For by-ref parameters to work, we employ the WASM linear stack similarly to
+the way it's used in the [WASM Basic C
+ABI](https://eli.thegreenplace.net/2025/notes-on-the-wasm-basic-c-abi/). The
+variable is copied to linear memory, and its address is passed to the function.
+When the function accesses such variables, it uses `i32.load` and `i32.store`
+instructions to interact with memory.
+
+Here's the WASM emitted for the `divmod` procedure as shown above:
+
+```
+(func $DIVMOD (param $DIVIDEND i32) (param $DIVISOR i32) (param $QUOTIENT i32) (param $REMAINDER i32)
+  local.get $QUOTIENT
+  local.get $DIVIDEND
+  local.get $DIVISOR
+  i32.div_s
+  i32.store
+  local.get $REMAINDER
+  local.get $DIVIDEND
+  local.get $QUOTIENT
+  i32.load
+  local.get $DIVISOR
+  i32.mul
+  i32.sub
+  i32.store
+)
+```
+
+Our compiler now has a symbol table to distinguish local variables from globals
+and from procedures, and also mark local variables as by-ref or by-value. Local
+variables are supported, just like in the original tutorial. The symbol table
+has a parent link, so it also supports shadowing of globals by locals, as is
+usual in languages like C. Later on when the original tutorial describes types,
+our symbol table is natural to extend with type information for variables. We
+can also easily support lexical scopes using this infrastructure.
+
+Note that this also means we require procedures to be defined before their
+use (because the call sites needs to know about the procedure's parameters,
+their number and whether they are by-ref). This is a common limitation in
+programming languages, and it can be later mitigated by either using multiple
+compiler passes or having forward declarations.
+
+Our compiler still follows the "syntax directed translation" approach of the
+original tutorial: the parser emits code as it goes. At this level of
+complexity, however, I'm starting to feel it would be better to separate the
+compiler into distinct phases. At the very least, the parser would produce
+and AST, and then a distinct step would take the AST and emit code from it.
+
+As things stand now, it's difficult to emit tight code because we don't know
+what's ahead - and we can't just peek without emitting code or doing some sort
+of backpatching. For example, when we emit arguments for calls, we have to make
+space for each ref argument on the stack separately. It's difficult to count
+arguments ahead of time and emit a single stack size increase because parsing
+arguments also emits the code for them.
+
+This is an interesting lesson in compiler construction; syntax directed
+translation is a great way to get started because it's easy to see results very
+quickly for a simple language. However, as the complexity of the input language
+grows, this method becomes a hindrance and it's worth switching to a more
+advanced, layered compiler architecture.
