@@ -436,7 +436,6 @@ changes are required.
 ## Part 13: Procedures
 
 Note the change in toplevel method of Compiler
-TODO: implement procedures with parameters, using multi-char tokens everywhere.
 Need symbol table with parent links, to push when a new procedure is compiled
 (populated with its formal params), and generate locals for them. The type
 should say global or param, and that's how we know what to emit.

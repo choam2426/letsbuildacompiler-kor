@@ -251,8 +251,6 @@ class Compiler:
         self.emit_ln("  ;; Linear stack pointer. Used to pass parameters by ref.")
         self.emit_ln("  ;; Grows downwards (towards lower addresses).")
         self.emit_ln("  (global $__sp (mut i32) (i32.const 65536))")
-        self.emit_ln("  ;; Temporary variable for intermediate values.")
-        self.emit_ln("  (global $__tmp (mut i32) (i32.const 0))")
         self.emit_ln("")
 
     def module_epilog(self):
@@ -532,39 +530,30 @@ class Compiler:
                 param_name = self.match(TokenKind.NAME)
                 entry = self.lookup_symbol(param_name)
 
-                # For arguments that are themselves reference parameters, we
-                # just pass the reference along - there's no need to load/store
-                # the value from/to the stack.
-                need_store = True
                 match entry:
                     case None:
                         self.undefined(param_name)
                     case LocalVar(ref=True):
+                        # If the parameter is a by-ref local variable, we don't
+                        # need to do anything special: just pass it as usual,
+                        # as it's already an address.
                         self.emit_ln(f"local.get ${param_name}")
-                        need_store = False
                     case LocalVar(ref=False):
+                        self.alloc_stack_space(4)
+                        self.emit_ln("global.get $__sp")
                         self.emit_ln(f"local.get ${param_name}")
+                        self.emit_ln("i32.store")
+                        self.emit_ln("global.get $__sp    ;; push address as parameter")
+                        ref_entries.append(NamedEntry(param_name, entry))
                     case GlobalVar():
+                        self.alloc_stack_space(4)
+                        self.emit_ln("global.get $__sp")
                         self.emit_ln(f"global.get ${param_name}")
+                        self.emit_ln("i32.store")
+                        self.emit_ln("global.get $__sp    ;; push address as parameter")
+                        ref_entries.append(NamedEntry(param_name, entry))
                     case _:
                         self.abort(f"Cannot refer to {param_name}")
-                assert entry is not None
-                param_entry = NamedEntry(param_name, entry)
-
-                if need_store:
-                    self.emit_ln(f";; parameter {proc_params[nparam].name} by ref")
-                    self.emit_ln("global.get $__sp      ;; make space on stack")
-                    self.emit_ln("i32.const 4")
-                    self.emit_ln("i32.sub")
-                    self.emit_ln("global.set $__sp")
-                    # Store the parameter value at sp
-                    self.emit_ln("global.set $__tmp     ;; store parameter")
-                    self.emit_ln("global.get $__sp")
-                    self.emit_ln("global.get $__tmp")
-                    self.emit_ln("i32.store")
-                    # Push the address (sp) as the parameter
-                    self.emit_ln("global.get $__sp      ;; push address as parameter")
-                    ref_entries.append(param_entry)
             else:
                 self.expression()
             nparam += 1
@@ -577,6 +566,12 @@ class Compiler:
                 f"Procedure {procname} expects {len(proc_params)} parameters, got {nparam}"
             )
         return ref_entries
+
+    def alloc_stack_space(self, nbytes: int):
+        self.emit_ln("global.get $__sp      ;; make space on stack")
+        self.emit_ln(f"i32.const {nbytes}")
+        self.emit_ln("i32.sub")
+        self.emit_ln("global.set $__sp")
 
     def factor(self):
         if self.token.kind == TokenKind.LPAREN:
