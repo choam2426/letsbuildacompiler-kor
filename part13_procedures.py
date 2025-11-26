@@ -64,7 +64,12 @@ class Token:
     value: str
 
 
-# Types for our symbol table entries.
+# The symbol table maps names to entries in a given scope. We don't support
+# lexical scopes yet, so the only available scopes are in procedures and the
+# global scope. Symbol tables do have parent links to allow lookups in a parent
+# scope and temporary shadowing of variables in procedures.
+#
+# A name is mapped to an entry, which is of type SymbolTableEntry.
 @dataclass
 class GlobalVar:
     pass
@@ -184,6 +189,10 @@ class Compiler:
             return False
 
     def lookup_symbol(self, name: str) -> SymbolTableEntry | None:
+        """Looks up a name in the symbol table.
+
+        Starts with self.symtable and goes up the parent chain.
+        """
         table = self.symtable
         while table is not None:
             if name in table.entries:
@@ -236,13 +245,17 @@ class Compiler:
     def emit_ln(self, s: str):
         self.output.write(" " * self.indent + s + "\n")
 
-    def prolog(self):
+    def module_prolog(self):
         self.emit_ln("(module")
         self.emit_ln("  (memory 8)")
+        self.emit_ln("  ;; Linear stack pointer. Used to pass parameters by ref.")
+        self.emit_ln("  ;; Grows downwards (towards lower addresses).")
         self.emit_ln("  (global $__sp (mut i32) (i32.const 65536))")
+        self.emit_ln("  ;; Temporary variable for intermediate values.")
         self.emit_ln("  (global $__tmp (mut i32) (i32.const 0))")
+        self.emit_ln("")
 
-    def epilog(self):
+    def module_epilog(self):
         self.emit_ln(")")
 
     def add_symbol(self, name: str, entry: SymbolTableEntry):
@@ -290,11 +303,11 @@ class Compiler:
 
         Called after initialization to start the compilation process.
         """
-        self.prolog()
+        self.module_prolog()
         self.indent += 2
         self.top_decls()
         self.indent -= 2
-        self.epilog()
+        self.module_epilog()
 
     # <top-level decl> ::= <data decl> | <procedure> | <main program>
     # <data decl> ::= 'VAR' <var-list>
@@ -320,6 +333,7 @@ class Compiler:
         self.advance_scanner()
         self.match(TokenKind.NAME)
         self.match_name("BEGIN")
+        self.emit_ln("")
         self.emit_ln('(func $main (export "main") (result i32)')
         self.indent += 2
         self.block()
@@ -355,6 +369,7 @@ class Compiler:
         self.symtable = SymbolTable(entries=new_entries, parent=self.symtable)
 
         params_str = " ".join(f"(param ${p.name} i32)" for p in params)
+        self.emit_ln("")
         self.emit_ln(f"(func ${name} {params_str}")
         self.indent += 2
 
