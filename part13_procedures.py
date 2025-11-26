@@ -455,9 +455,29 @@ class Compiler:
             self.procedure_call(name)
         else:
             # Assignment
+            entry = self.lookup_symbol(name)
             self.match(TokenKind.EQUAL)
+
+            # For by-ref local variables, place the address on TOS before
+            # the value, so we can store into it.
+            match entry:
+                case LocalVar(ref=True):
+                    self.emit_ln(f"local.get ${name}")
+
             self.bool_expression()
-            self.emit_assignment(name)
+
+            match entry:
+                case None:
+                    self.undefined(name)
+                case LocalVar(ref=True):
+                    # The stack now has [ ... addr value ], so just store.
+                    self.emit_ln("i32.store")
+                case LocalVar(ref=False):
+                    self.emit_ln(f"local.set ${name}")
+                case GlobalVar():
+                    self.emit_ln(f"global.set ${name}")
+                case _:
+                    self.abort(f"Cannot assign to {name}")
 
     # <proc call> ::= <ident> ( [ <call-param> ( , <call-param> )* ] )
     def procedure_call(self, name: str):
@@ -557,26 +577,6 @@ class Compiler:
                 f"Procedure {procname} expects {len(proc_params)} parameters, got {nparam}"
             )
         return ref_entries
-
-    def emit_assignment(self, name: str):
-        entry = self.lookup_symbol(name)
-        match entry:
-            case None:
-                self.undefined(name)
-            case LocalVar(ref=True):
-                # We currently have the value at TOS, but we need the address
-                # below it. Use $__tmp to set the stack in the right order
-                # for storing.
-                self.emit_ln("global.set $__tmp")
-                self.emit_ln(f"local.get ${name}")
-                self.emit_ln("global.get $__tmp")
-                self.emit_ln("i32.store")
-            case LocalVar(ref=False):
-                self.emit_ln(f"local.set ${name}")
-            case GlobalVar():
-                self.emit_ln(f"global.set ${name}")
-            case _:
-                self.abort(f"Cannot assign to {name}")
 
     def factor(self):
         if self.token.kind == TokenKind.LPAREN:
