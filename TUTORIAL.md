@@ -512,3 +512,20 @@ translation is a great way to get started because it's easy to see results very
 quickly for a simple language. However, as the complexity of the input language
 grows, this method becomes a hindrance and it's worth switching to a more
 advanced, layered compiler architecture.
+
+## Part 14: Types
+
+TODO: ...
+
+Once again, the original tutorial states:
+
+  As I did in the last segment, I will NOT incorporate
+  these  features directly into the TINY  compiler  at  this  time.
+  Instead, I'll be using the same approach that has worked  so well
+  for  us  in the past: using only  fragments  of  the  parser  and
+  single-character  tokens.
+
+However, we *will* be incorporating the feature into our compiler, as before,
+and will emerge with a type-capable version of the language from part 13
+(including procedure definitions and calls).
+
