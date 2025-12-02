@@ -70,13 +70,11 @@ class ValueType(Enum):
     TypeLong = auto()
 
 
+# For this part, we're back to supporting just global variables. However,
+# we'll leave the SymbolTableEntry and GlobalVar classes here to make future
+# adjustments easier.
 @dataclass
 class GlobalVar:
-    typ: ValueType = ValueType.TypeLong
-
-
-@dataclass
-class LocalVar:
     typ: ValueType = ValueType.TypeLong
 
 
@@ -182,17 +180,18 @@ class Compiler:
         else:
             return False
 
-    def lookup_symbol(self, name: str) -> SymbolTableEntry | None:
+    def lookup_symbol(self, name: str) -> SymbolTableEntry:
         """Looks up a name in the symbol table.
 
-        Starts with self.symtable and goes up the parent chain.
+        Starts with self.symtable and goes up the parent chain. Aborts if
+        not found.
         """
         table = self.symtable
         while table is not None:
             if name in table.entries:
                 return table.entries[name]
             table = table.parent
-        return None
+        self.abort(f"Undefined identifier {name}")
 
     def abort(self, msg: str) -> NoReturn:
         raise Exception(f"Error: {msg}")
@@ -263,7 +262,6 @@ class Compiler:
 
     def module_prolog(self):
         self.emit_ln("(module")
-        self.emit_ln("  (memory 8)")
         self.emit_ln("")
 
     def module_epilog(self):
@@ -294,10 +292,6 @@ class Compiler:
         name = self.match(TokenKind.NAME)
         entry = self.lookup_symbol(name)
         match entry:
-            case None:
-                self.undefined(name)
-            case LocalVar():
-                self.emit_ln(f"local.get ${name}")
             case GlobalVar():
                 self.emit_ln(f"global.get ${name}")
             case _:
@@ -315,7 +309,7 @@ class Compiler:
         self.module_epilog()
 
     # <top-level decl> ::= <data decl> <main program>
-    # <data decl> ::= 'VAR' <var-list>
+    # <data decl> ::= 'VAR' ...
     # <main program> ::= 'PROGRAM' <ident> <block> 'END'
     def top_decls(self):
         while self.token.kind != TokenKind.DOT:
@@ -341,7 +335,8 @@ class Compiler:
         self.block()
 
         # By convention our "ABI", the main function returns the value of the
-        # global variable X.
+        # global variable X. Note that in this typed version, we assume X is
+        # i32 to match the return type of main.
         self.emit_ln("global.get $X")
         self.indent -= 2
         self.emit_ln(")")
@@ -352,8 +347,7 @@ class Compiler:
     # <var> ::= <ident> [ = <num> ]
     def decl(self):
         self.match_name("VAR")
-        type_name = self.match(TokenKind.NAME)
-        typ = self.type_from_name(type_name)
+        typ = self.type_from_name(self.match(TokenKind.NAME))
         self.alloc_var(self.match(TokenKind.NAME), typ=typ)
         while self.token.kind == TokenKind.COMMA:
             self.advance_scanner()
@@ -408,10 +402,6 @@ class Compiler:
         self.bool_expression()
 
         match entry:
-            case None:
-                self.undefined(name)
-            case LocalVar():
-                self.emit_ln(f"local.set ${name}")
             case GlobalVar():
                 self.emit_ln(f"global.set ${name}")
             case _:

@@ -37,6 +37,20 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 32)
 
+        result = self.compile_and_run(
+            r"""
+            var long X=9, Y=10;
+            var long Z=5;
+
+            program testprog
+            begin
+                X = X + Y * Z
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 59)
+
 
 if __name__ == "__main__":
     unittest.main()
