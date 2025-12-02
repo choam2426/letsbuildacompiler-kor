@@ -23,22 +23,14 @@ class TestCompileAndExecute(unittest.TestCase):
         full_code = self.compile_to_wasm(src, show=show)
         return run_wasm(full_code)
 
-    def test_procedure_with_local_vars(self):
+    def test_global_with_type(self):
         result = self.compile_and_run(
             r"""
             var long X=0
 
-            procedure aproc()
-                var long y, z, t;
-                y = 2
-                z = 13
-                t = 17
-                X = X + y + z + t
-            end
-
             program testprog
             begin
-                aproc()
+                X = X + 32
             end
             .
             """

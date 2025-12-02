@@ -64,12 +64,6 @@ class Token:
     value: str
 
 
-# The symbol table maps names to entries in a given scope. We don't support
-# lexical scopes yet, so the only available scopes are in procedures and the
-# global scope. Symbol tables do have parent links to allow lookups in a parent
-# scope and temporary shadowing of variables in procedures.
-#
-# A name is mapped to an entry, which is of type SymbolTableEntry.
 class ValueType(Enum):
     TypeByte = auto()
     TypeWord = auto()
@@ -83,16 +77,10 @@ class GlobalVar:
 
 @dataclass
 class LocalVar:
-    ref: bool
     typ: ValueType = ValueType.TypeLong
 
 
-@dataclass
-class Procedure:
-    params: list[NamedEntry]
-
-
-SymbolTableEntry = GlobalVar | LocalVar | Procedure
+SymbolTableEntry = GlobalVar
 
 
 @dataclass
@@ -104,7 +92,6 @@ class NamedEntry:
 @dataclass
 class SymbolTable:
     entries: dict[str, SymbolTableEntry]
-    parent: SymbolTable | None = None
 
 
 class Compiler:
@@ -237,6 +224,28 @@ class Compiler:
     def token_is_name(self, name: str) -> bool:
         return self.token.kind == TokenKind.NAME and self.token.value == name
 
+    def type_from_name(self, type_name: str) -> ValueType:
+        match type_name:
+            case "BYTE":
+                return ValueType.TypeByte
+            case "WORD":
+                return ValueType.TypeWord
+            case "LONG":
+                return ValueType.TypeLong
+            case _:
+                self.abort(f"Unknown type {type_name}")
+
+    def type_to_wasm(self, typ: ValueType) -> str:
+        match typ:
+            case ValueType.TypeByte:
+                return "i8"
+            case ValueType.TypeWord:
+                return "i16"
+            case ValueType.TypeLong:
+                return "i32"
+            case _:
+                self.abort(f"Unknown type {typ}")
+
     def semi(self):
         """Optionally consume a semicolon. No-op for other tokens."""
         if self.token.kind == TokenKind.SEMICOLON:
@@ -255,9 +264,6 @@ class Compiler:
     def module_prolog(self):
         self.emit_ln("(module")
         self.emit_ln("  (memory 8)")
-        self.emit_ln("  ;; Linear stack pointer. Used to pass parameters by ref.")
-        self.emit_ln("  ;; Grows downwards (towards lower addresses).")
-        self.emit_ln("  (global $__sp (mut i32) (i32.const 65536))")
         self.emit_ln("")
 
     def module_epilog(self):
@@ -268,21 +274,18 @@ class Compiler:
             self.abort(f"Duplicate symbol {name}")
         self.symtable.entries[name] = entry
 
-    def alloc_var(self, name: str, typ: ValueType, is_global: bool):
-        if is_global:
-            value = "0"
-            if self.token.kind == TokenKind.EQUAL:
+    def alloc_var(self, name: str, typ: ValueType):
+        wasmtype = self.type_to_wasm(typ)
+        value = "0"
+        if self.token.kind == TokenKind.EQUAL:
+            self.advance_scanner()
+            if self.token.kind == TokenKind.SUB:
                 self.advance_scanner()
-                if self.token.kind == TokenKind.SUB:
-                    self.advance_scanner()
-                    value = "-" + self.match(TokenKind.NUMBER)
-                else:
-                    value = self.match(TokenKind.NUMBER)
-            self.add_symbol(name, GlobalVar(typ=typ))
-            self.emit_ln(f"(global ${name} (mut i32) (i32.const {value}))")
-        else:
-            self.add_symbol(name, LocalVar(ref=False, typ=typ))
-            self.emit_ln(f"(local ${name} i32)")
+                value = "-" + self.match(TokenKind.NUMBER)
+            else:
+                value = self.match(TokenKind.NUMBER)
+        self.add_symbol(name, GlobalVar(typ=typ))
+        self.emit_ln(f"(global ${name} (mut {wasmtype}) ({wasmtype}.const {value}))")
 
     def undefined(self, name: str):
         self.abort(f"Undefined identifier {name}")
@@ -293,10 +296,7 @@ class Compiler:
         match entry:
             case None:
                 self.undefined(name)
-            case LocalVar(ref=True):
-                self.emit_ln(f"local.get ${name}")
-                self.emit_ln("i32.load")
-            case LocalVar(ref=False):
+            case LocalVar():
                 self.emit_ln(f"local.get ${name}")
             case GlobalVar():
                 self.emit_ln(f"global.get ${name}")
@@ -314,9 +314,8 @@ class Compiler:
         self.indent -= 2
         self.module_epilog()
 
-    # <top-level decl> ::= <data decl> | <procedure> | <main program>
+    # <top-level decl> ::= <data decl> <main program>
     # <data decl> ::= 'VAR' <var-list>
-    # <procedure> ::= 'PROCEDURE' <ident> <block> 'END'
     # <main program> ::= 'PROGRAM' <ident> <block> 'END'
     def top_decls(self):
         while self.token.kind != TokenKind.DOT:
@@ -324,10 +323,8 @@ class Compiler:
                 self.expected("a top-level declaration")
             match self.token.value:
                 case "VAR":
-                    self.decl(is_global=True)
+                    self.decl()
                     self.semi()
-                case "PROCEDURE":
-                    self.procedure()
                 case "PROGRAM":
                     self.program()
                 case _:
@@ -350,80 +347,17 @@ class Compiler:
         self.emit_ln(")")
         self.match_name("END")
 
-    def procedure(self):
-        self.advance_scanner()
-        name = self.match(TokenKind.NAME)
-
-        # Collect parameters
-        self.match(TokenKind.LPAREN)
-        params = []
-        if self.token.kind != TokenKind.RPAREN:
-            param = self.procedure_param()
-            params.append(param)
-            while self.token.kind == TokenKind.COMMA:
-                self.advance_scanner()
-                param = self.procedure_param()
-                params.append(param)
-        self.match(TokenKind.RPAREN)
-
-        # Add procedure to symbol table
-        self.add_symbol(name, Procedure(params=params))
-
-        # Push frame onto symtable with parameters
-        new_entries = {p.name: p.entry for p in params}
-        self.symtable = SymbolTable(entries=new_entries, parent=self.symtable)
-
-        params_str = " ".join(f"(param ${p.name} i32)" for p in params)
-        self.emit_ln("")
-        self.emit_ln(f"(func ${name} {params_str}")
-        self.indent += 2
-
-        # Process local declarations
-        while self.token_is_name("VAR"):
-            self.decl(is_global=False)
-            self.semi()
-
-        self.block()
-
-        self.indent -= 2
-        self.emit_ln(")")
-        self.match_name("END")
-
-        # Pop frame from symtable
-        assert self.symtable.parent is not None
-        self.symtable = self.symtable.parent
-
-    # <procedure-param> ::= [ 'ref' ] <ident>
-    def procedure_param(self) -> NamedEntry:
-        ref_or_name = self.match(TokenKind.NAME)
-        if ref_or_name == "REF":
-            name = self.match(TokenKind.NAME)
-            return NamedEntry(name, LocalVar(ref=True))
-        else:
-            return NamedEntry(ref_or_name, LocalVar(ref=False))
-
-    def type_from_name(self, type_name: str) -> ValueType:
-        match type_name:
-            case "BYTE":
-                return ValueType.TypeByte
-            case "WORD":
-                return ValueType.TypeWord
-            case "LONG":
-                return ValueType.TypeLong
-            case _:
-                self.abort(f"Unknown type {type_name}")
-
     # <decl> ::= 'VAR' <type> <var-list>
     # <var-list> ::= <var> (, <var> )*
     # <var> ::= <ident> [ = <num> ]
-    def decl(self, is_global: bool):
+    def decl(self):
         self.match_name("VAR")
         type_name = self.match(TokenKind.NAME)
         typ = self.type_from_name(type_name)
-        self.alloc_var(self.match(TokenKind.NAME), typ=typ, is_global=is_global)
+        self.alloc_var(self.match(TokenKind.NAME), typ=typ)
         while self.token.kind == TokenKind.COMMA:
             self.advance_scanner()
-            self.alloc_var(self.match(TokenKind.NAME), typ=typ, is_global=is_global)
+            self.alloc_var(self.match(TokenKind.NAME), typ=typ)
 
     # <if> ::= IF <bool-expression> <block> [ ELSE <block>] END
     # <while> ::= WHILE <bool-expression> <block> END
@@ -446,7 +380,7 @@ class Compiler:
             case "BREAK":
                 self.do_break(breakloop_label)
             case _:
-                self.assign_or_proc()
+                self.assign()
         return False
 
     def block(self, breakloop_label: str = ""):
@@ -456,7 +390,6 @@ class Compiler:
                 break
             self.semi()
 
-    # <proc> ::= <ident> ( )
     # <assignment> ::= <ident> '=' <bool-expression>
     # <expression> ::= <first term> ( <addop> <term> )*
     # <term> ::= <factor> ( <mulop> <factor> )*
@@ -468,131 +401,21 @@ class Compiler:
     # <bool-term> ::= <not-factor> ( <andop> <not-factor> )*
     # <not-factor> ::= [ '!' ] <relation>
     # <relation> ::= <expression> [ <relop> <expression> ]
-    def assign_or_proc(self):
+    def assign(self):
         name = self.match(TokenKind.NAME)
-        if self.token.kind == TokenKind.LPAREN:
-            self.procedure_call(name)
-        else:
-            # Assignment
-            entry = self.lookup_symbol(name)
-            self.match(TokenKind.EQUAL)
-
-            # For by-ref local variables, place the address on TOS before
-            # the value, so we can store into it.
-            match entry:
-                case LocalVar(ref=True):
-                    self.emit_ln(f"local.get ${name}")
-
-            self.bool_expression()
-
-            match entry:
-                case None:
-                    self.undefined(name)
-                case LocalVar(ref=True):
-                    # The stack now has [ ... addr value ], so just store.
-                    self.emit_ln("i32.store")
-                case LocalVar(ref=False):
-                    self.emit_ln(f"local.set ${name}")
-                case GlobalVar():
-                    self.emit_ln(f"global.set ${name}")
-                case _:
-                    self.abort(f"Cannot assign to {name}")
-
-    # <proc call> ::= <ident> ( [ <call-param> ( , <call-param> )* ] )
-    def procedure_call(self, name: str):
-        self.match(TokenKind.LPAREN)
         entry = self.lookup_symbol(name)
-        ref_entries = []
+        self.match(TokenKind.EQUAL)
+        self.bool_expression()
+
         match entry:
-            case Procedure(params=params):
-                if self.token.kind == TokenKind.RPAREN:
-                    if len(params) != 0:
-                        self.abort(
-                            f"Procedure {name} expects {len(params)} parameters, got 0"
-                        )
-                else:
-                    ref_entries.extend(self.call_argument(name, params))
-                self.match(TokenKind.RPAREN)
+            case None:
+                self.undefined(name)
+            case LocalVar():
+                self.emit_ln(f"local.set ${name}")
+            case GlobalVar():
+                self.emit_ln(f"global.set ${name}")
             case _:
-                self.abort(f"Undefined procedure {name}")
-        self.emit_ln(f"call ${name}")
-        if len(ref_entries) > 0:
-            for i, entry in enumerate(reversed(ref_entries)):
-                # Store the reference parameters back into their
-                # variables.
-                self.emit_ln(f";; restore parameter {entry.name} by ref")
-                self.emit_ln("global.get $__sp")
-                self.emit_ln(f"i32.load offset={i * 4}")
-                if isinstance(entry.entry, LocalVar):
-                    self.emit_ln(f"local.set ${entry.name}")
-                elif isinstance(entry.entry, GlobalVar):
-                    self.emit_ln(f"global.set ${entry.name}")
-                else:
-                    self.abort("Invalid reference parameter")
-            self.emit_ln(";; clean up stack for ref parameters")
-            self.emit_ln("global.get $__sp")
-            self.emit_ln(f"i32.const {len(ref_entries) * 4}")
-            self.emit_ln("i32.add")
-            self.emit_ln("global.set $__sp")
-
-    # Process a single argument to a call. Note that there is syntax table
-    # dependent parsing here: for ref parameters we expect a variable name,
-    # and for other parameters we accept arbitrary expressions.
-    #
-    # Returns a list of NamedEntry for parameters passed by reference that
-    # need to be restored from the stack after the call.
-    def call_argument(
-        self, procname: str, proc_params: list[NamedEntry]
-    ) -> list[NamedEntry]:
-        ref_entries = []
-        nparam = 0
-        while True:
-            if nparam < len(proc_params) and proc_params[nparam].entry.ref:
-                param_name = self.match(TokenKind.NAME)
-                entry = self.lookup_symbol(param_name)
-
-                match entry:
-                    case None:
-                        self.undefined(param_name)
-                    case LocalVar(ref=True):
-                        # If the parameter is a by-ref local variable, we don't
-                        # need to do anything special: just pass it as usual,
-                        # as it's already an address.
-                        self.emit_ln(f"local.get ${param_name}")
-                    case LocalVar(ref=False):
-                        self.alloc_stack_space(4)
-                        self.emit_ln("global.get $__sp")
-                        self.emit_ln(f"local.get ${param_name}")
-                        self.emit_ln("i32.store")
-                        self.emit_ln("global.get $__sp    ;; push address as parameter")
-                        ref_entries.append(NamedEntry(param_name, entry))
-                    case GlobalVar():
-                        self.alloc_stack_space(4)
-                        self.emit_ln("global.get $__sp")
-                        self.emit_ln(f"global.get ${param_name}")
-                        self.emit_ln("i32.store")
-                        self.emit_ln("global.get $__sp    ;; push address as parameter")
-                        ref_entries.append(NamedEntry(param_name, entry))
-                    case _:
-                        self.abort(f"Cannot refer to {param_name}")
-            else:
-                self.expression()
-            nparam += 1
-            if self.token.kind == TokenKind.COMMA:
-                self.advance_scanner()
-            else:
-                break
-        if nparam != len(proc_params):
-            self.abort(
-                f"Procedure {procname} expects {len(proc_params)} parameters, got {nparam}"
-            )
-        return ref_entries
-
-    def alloc_stack_space(self, nbytes: int):
-        self.emit_ln("global.get $__sp      ;; make space on stack")
-        self.emit_ln(f"i32.const {nbytes}")
-        self.emit_ln("i32.sub")
-        self.emit_ln("global.set $__sp")
+                self.abort(f"Cannot assign to {name}")
 
     def factor(self):
         if self.token.kind == TokenKind.LPAREN:
