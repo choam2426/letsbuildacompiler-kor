@@ -65,9 +65,8 @@ class Token:
 
 
 class ValueType(Enum):
-    TypeByte = auto()
-    TypeWord = auto()
     TypeLong = auto()
+    TypeQuad = auto()
 
 
 # For this part, we're back to supporting just global variables. However,
@@ -225,23 +224,19 @@ class Compiler:
 
     def type_from_name(self, type_name: str) -> ValueType:
         match type_name:
-            case "BYTE":
-                return ValueType.TypeByte
-            case "WORD":
-                return ValueType.TypeWord
             case "LONG":
                 return ValueType.TypeLong
+            case "QUAD":
+                return ValueType.TypeQuad
             case _:
                 self.abort(f"Unknown type {type_name}")
 
     def type_to_wasm(self, typ: ValueType) -> str:
         match typ:
-            case ValueType.TypeByte:
-                return "i8"
-            case ValueType.TypeWord:
-                return "i16"
             case ValueType.TypeLong:
                 return "i32"
+            case ValueType.TypeQuad:
+                return "i64"
             case _:
                 self.abort(f"Unknown type {typ}")
 

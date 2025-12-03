@@ -27,6 +27,7 @@ class TestCompileAndExecute(unittest.TestCase):
         result = self.compile_and_run(
             r"""
             var long X=0
+            var quad Q=99
 
             program testprog
             begin

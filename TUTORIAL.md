@@ -517,6 +517,8 @@ advanced, layered compiler architecture.
 
 TODO: ...
 
+To simplify type handling, use LONG and QUAD types
+
 Once again, the original tutorial states:
 
   As I did in the last segment, I will NOT incorporate
