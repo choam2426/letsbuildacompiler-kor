@@ -74,7 +74,7 @@ class ValueType(Enum):
 # adjustments easier.
 @dataclass
 class GlobalVar:
-    typ: ValueType = ValueType.TypeLong
+    typ: ValueType = ValueType.TypeQuad
 
 
 SymbolTableEntry = GlobalVar
@@ -325,7 +325,7 @@ class Compiler:
         self.match(TokenKind.NAME)
         self.match_name("BEGIN")
         self.emit_ln("")
-        self.emit_ln('(func $main (export "main") (result i32)')
+        self.emit_ln('(func $main (export "main") (result i64)')
         self.indent += 2
         self.block()
 
@@ -411,16 +411,16 @@ class Compiler:
             self.ident()
         else:
             num = self.match(TokenKind.NUMBER)
-            self.emit_ln(f"i32.const {num}")
+            self.emit_ln(f"i64.const {num}")
 
     def neg_factor(self):
         self.match(TokenKind.SUB)
         if self.token.kind == TokenKind.NUMBER:
-            self.emit_ln(f"i32.const -{self.match(TokenKind.NUMBER)}")
+            self.emit_ln(f"i64.const -{self.match(TokenKind.NUMBER)}")
         else:
             self.factor()
-            self.emit_ln("i32.const -1")
-            self.emit_ln("i32.mul")
+            self.emit_ln("i64.const -1")
+            self.emit_ln("i64.mul")
 
     def first_factor(self):
         match self.token.kind:
@@ -435,12 +435,12 @@ class Compiler:
     def multiply(self):
         self.advance_scanner()
         self.factor()
-        self.emit_ln("i32.mul")
+        self.emit_ln("i64.mul")
 
     def divide(self):
         self.advance_scanner()
         self.factor()
-        self.emit_ln("i32.div_s")
+        self.emit_ln("i64.div_s")
 
     def term1(self):
         # Common code for term and first_term
@@ -461,12 +461,12 @@ class Compiler:
     def add(self):
         self.advance_scanner()
         self.term()
-        self.emit_ln("i32.add")
+        self.emit_ln("i64.add")
 
     def subtract(self):
         self.advance_scanner()
         self.term()
-        self.emit_ln("i32.sub")
+        self.emit_ln("i64.sub")
 
     def expression(self):
         self.first_term()
@@ -479,32 +479,32 @@ class Compiler:
     def equals(self):
         self.advance_scanner()
         self.expression()
-        self.emit_ln("i32.eq")
+        self.emit_ln("i64.eq")
 
     def not_equals(self):
         self.advance_scanner()
         self.expression()
-        self.emit_ln("i32.ne")
+        self.emit_ln("i64.ne")
 
     def less_than(self):
         self.advance_scanner()
         self.expression()
-        self.emit_ln("i32.lt_s")
+        self.emit_ln("i64.lt_s")
 
     def less_equal(self):
         self.advance_scanner()
         self.expression()
-        self.emit_ln("i32.le_s")
+        self.emit_ln("i64.le_s")
 
     def greater_than(self):
         self.advance_scanner()
         self.expression()
-        self.emit_ln("i32.gt_s")
+        self.emit_ln("i64.gt_s")
 
     def greater_equal(self):
         self.advance_scanner()
         self.expression()
-        self.emit_ln("i32.ge_s")
+        self.emit_ln("i64.ge_s")
 
     def relation(self):
         self.expression()
@@ -528,7 +528,7 @@ class Compiler:
         if self.token.kind == TokenKind.NOT:
             self.advance_scanner()
             self.relation()
-            self.emit_ln("i32.eqz")
+            self.emit_ln("i64.eqz")
         else:
             self.relation()
 
@@ -537,17 +537,17 @@ class Compiler:
         while self.token.kind == TokenKind.AND:
             self.advance_scanner()
             self.not_factor()
-            self.emit_ln("i32.and")
+            self.emit_ln("i64.and")
 
     def bool_or(self):
         self.advance_scanner()
         self.bool_term()
-        self.emit_ln("i32.or")
+        self.emit_ln("i64.or")
 
     def bool_xor(self):
         self.advance_scanner()
         self.bool_term()
-        self.emit_ln("i32.xor")
+        self.emit_ln("i64.xor")
 
     def bool_expression(self):
         self.bool_term()
@@ -589,7 +589,7 @@ class Compiler:
         self.bool_expression()
         # For a while loop the break condition is the inverse of the loop
         # condition.
-        self.emit_ln("i32.eqz")
+        self.emit_ln("i64.eqz")
         self.emit_ln(f"br_if {labels['break']}")
         self.block(labels["break"])
         self.emit_ln(f"br {labels['loop']}")

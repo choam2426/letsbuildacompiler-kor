@@ -26,8 +26,8 @@ class TestCompileAndExecute(unittest.TestCase):
     def test_global_with_type(self):
         result = self.compile_and_run(
             r"""
-            var long X=0
-            var quad Q=99
+            var quad X=0
+            var long Q=99
 
             program testprog
             begin
@@ -40,8 +40,8 @@ class TestCompileAndExecute(unittest.TestCase):
 
         result = self.compile_and_run(
             r"""
-            var long X=9, Y=10;
-            var long Z=5;
+            var quad X=9, Y=10;
+            var quad Z=5;
 
             program testprog
             begin
