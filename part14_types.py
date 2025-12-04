@@ -585,7 +585,7 @@ class Compiler:
                 self.emit_ln(f"i64.{op}")
                 return ValueType.TypeQuad
             case (ValueType.TypeQuad, ValueType.TypeLong):
-                self.emit_ln("i32.extend_i32_s")
+                self.emit_ln("i64.extend_i32_s")
                 self.emit_ln(f"i64.{op}")
                 return ValueType.TypeQuad
             case (ValueType.TypeLong, ValueType.TypeQuad):

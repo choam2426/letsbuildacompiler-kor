@@ -83,6 +83,56 @@ class TestCompileAndExecute(unittest.TestCase):
         )
         self.assertEqual(result, 25)
 
+    def test_long_to_quad_arithmetic_conversion(self):
+        # Quad in LHS
+        result = self.compile_and_run(
+            r"""
+            var long LNG=10;
+            var quad QD=20;
+            var quad X=0;
+
+            program testprog
+            begin
+                X = QD + LNG;
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 30)
+
+        # Long in LHS
+        result = self.compile_and_run(
+            r"""
+            var long LNG=50;
+            var quad QD=20;
+            var quad X=0;
+
+            program testprog
+            begin
+                X = LNG + QD;
+            end
+            .
+            """,
+        )
+        self.assertEqual(result, 70)
+
+        # Sequence of operations
+        result = self.compile_and_run(
+            r"""
+            var long A=5, B=15;
+            var quad C=20;
+            var quad X=0;
+
+            program testprog
+            begin
+                X = A + B + C;
+            end
+            .
+            """,
+            show=True,
+        )
+        self.assertEqual(result, 40)
+
 
 if __name__ == "__main__":
     unittest.main()
