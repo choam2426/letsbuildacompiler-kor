@@ -71,15 +71,10 @@ class ValueType(Enum):
 
 # For this part, we're back to supporting just global variables, folding them
 # into a single SymbolTableEntry type.
+# Each entry has a type.
 @dataclass
 class SymbolTableEntry:
     typ: ValueType = ValueType.TypeQuad
-
-
-@dataclass
-class NamedEntry:
-    name: str
-    entry: SymbolTableEntry
 
 
 @dataclass
@@ -176,11 +171,7 @@ class Compiler:
             return False
 
     def lookup_symbol(self, name: str) -> SymbolTableEntry:
-        """Looks up a name in the symbol table.
-
-        Starts with self.symtable and goes up the parent chain. Aborts if
-        not found.
-        """
+        """Looks up a name in the symbol table."""
         if name in self.symtable.entries:
             return self.symtable.entries[name]
         self.abort(f"Undefined identifier {name}")
@@ -188,7 +179,7 @@ class Compiler:
     def abort(self, msg: str) -> NoReturn:
         raise Exception(f"Error: {msg}")
 
-    def expected(self, s: str):
+    def expected(self, s: str) -> NoReturn:
         self.abort(f"{s} expected [has token '{self.token.value}']")
 
     def match(self, kind: TokenKind) -> str:
@@ -261,7 +252,6 @@ class Compiler:
         self.symtable.entries[name] = entry
 
     def alloc_var(self, name: str, typ: ValueType):
-        wasmtype = self.type_to_wasm(typ)
         value = "0"
         if self.token.kind == TokenKind.EQUAL:
             self.advance_scanner()
@@ -271,9 +261,11 @@ class Compiler:
             else:
                 value = self.match(TokenKind.NUMBER)
         self.add_symbol(name, SymbolTableEntry(typ=typ))
+        wasmtype = self.type_to_wasm(typ)
         self.emit_ln(f"(global ${name} (mut {wasmtype}) ({wasmtype}.const {value}))")
 
     def convert_type(self, from_type: ValueType, to_type: ValueType):
+        """Emit code to convert value on TOS from from_type to to_type."""
         if from_type == to_type:
             return
         match (from_type, to_type):
@@ -287,6 +279,8 @@ class Compiler:
     def undefined(self, name: str):
         self.abort(f"Undefined identifier {name}")
 
+    # For this part, many of the parsing methods now return ValueType to
+    # indicate the type of the expression they've parsed and emitted code for.
     def ident(self) -> ValueType:
         name = self.match(TokenKind.NAME)
         entry = self.lookup_symbol(name)
@@ -331,9 +325,8 @@ class Compiler:
         self.emit_ln("(local $tmp i64)")
         self.block()
 
-        # By convention our "ABI", the main function returns the value of the
-        # global variable X. Note that in this typed version, we assume X is
-        # i32 to match the return type of main.
+        # By convention (our "ABI"), the main function returns the value of the
+        # global variable X.
         self.emit_ln("global.get $X")
         self.indent -= 2
         self.emit_ln(")")
