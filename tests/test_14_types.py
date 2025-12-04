@@ -48,9 +48,40 @@ class TestCompileAndExecute(unittest.TestCase):
                 X = X + Y * Z
             end
             .
-            """
+            """,
         )
         self.assertEqual(result, 59)
+
+    def test_basic_long_conversion(self):
+        result = self.compile_and_run(
+            r"""
+            var quad X=0;
+            var long A=10;
+
+            program testprog
+            begin
+                X = A
+            end
+            .
+            """,
+        )
+        self.assertEqual(result, 10)
+
+    def test_long_arithmetic(self):
+        result = self.compile_and_run(
+            r"""
+            var long A=20, B=5, C=0;
+            var quad X;
+
+            program testprog
+            begin
+                C = A + B
+                X = C
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 25)
 
 
 if __name__ == "__main__":

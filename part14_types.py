@@ -400,10 +400,6 @@ class Compiler:
         entry = self.lookup_symbol(name)
         self.match(TokenKind.EQUAL)
         expr_type = self.bool_expression()
-
-        # TODO: here the result of the expression is on TOS. We should use
-        # convert_type() to convert it to the variable's type if needed.
-        # We should also have bool_expression return its type.
         self.convert_type(expr_type, entry.typ)
         self.emit_ln(f"global.set ${name}")
 
@@ -419,7 +415,6 @@ class Compiler:
             num = self.match(TokenKind.NUMBER)
             self.emit_ln(f"i64.const {num}")
             expr_type = ValueType.TypeQuad
-        print(f"returning from factor: expr_type={expr_type}")
         return expr_type
 
     def neg_factor(self) -> ValueType:
@@ -468,7 +463,6 @@ class Compiler:
 
     def first_term(self) -> ValueType:
         first_type = self.first_factor()
-        print(f"first_term: first_type={first_type}")
         return self.term1(first_type)
 
     def add(self, lhs_type: ValueType) -> ValueType:
