@@ -129,9 +129,46 @@ class TestCompileAndExecute(unittest.TestCase):
             end
             .
             """,
-            show=True,
         )
         self.assertEqual(result, 40)
+
+    def test_long_wraparound(self):
+        # 47000^2 is large than 2^31-1, so it should wrap around to negative,
+        # which will be sign-extended to quad.
+        result = self.compile_and_run(
+            r"""
+            var long A=47000;
+            var long B;
+            var quad X=0;
+
+            program testprog
+            begin
+                B = A * A
+                X = B
+            end
+            .
+            """
+        )
+        self.assertLess(result, 0)
+
+    def test_logical_long(self):
+        result = self.compile_and_run(
+            r"""
+            var long A=10, B=20;
+            var quad X=0;
+
+            program testprog
+            begin
+                if A < B
+                    X = 1
+                else
+                    X = 0
+                end
+            end
+            .
+            """
+        )
+        self.assertEqual(result, 1)
 
 
 if __name__ == "__main__":

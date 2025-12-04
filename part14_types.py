@@ -181,11 +181,8 @@ class Compiler:
         Starts with self.symtable and goes up the parent chain. Aborts if
         not found.
         """
-        table = self.symtable
-        while table is not None:
-            if name in table.entries:
-                return table.entries[name]
-            table = table.parent
+        if name in self.symtable.entries:
+            return self.symtable.entries[name]
         self.abort(f"Undefined identifier {name}")
 
     def abort(self, msg: str) -> NoReturn:
