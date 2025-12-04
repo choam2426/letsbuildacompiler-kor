@@ -517,7 +517,8 @@ advanced, layered compiler architecture.
 
 TODO: ...
 
-To simplify type handling, use LONG and QUAD types
+To simplify type handling, use LONG and QUAD types. Also i64 is the default
+type for this part
 
 Once again, the original tutorial states:
 

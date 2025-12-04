@@ -69,15 +69,11 @@ class ValueType(Enum):
     TypeQuad = auto()
 
 
-# For this part, we're back to supporting just global variables. However,
-# we'll leave the SymbolTableEntry and GlobalVar classes here to make future
-# adjustments easier.
+# For this part, we're back to supporting just global variables, folding them
+# into a single SymbolTableEntry type.
 @dataclass
-class GlobalVar:
+class SymbolTableEntry:
     typ: ValueType = ValueType.TypeQuad
-
-
-SymbolTableEntry = GlobalVar
 
 
 @dataclass
@@ -277,20 +273,27 @@ class Compiler:
                 value = "-" + self.match(TokenKind.NUMBER)
             else:
                 value = self.match(TokenKind.NUMBER)
-        self.add_symbol(name, GlobalVar(typ=typ))
+        self.add_symbol(name, SymbolTableEntry(typ=typ))
         self.emit_ln(f"(global ${name} (mut {wasmtype}) ({wasmtype}.const {value}))")
+
+    def convert_type(self, from_type: ValueType, to_type: ValueType):
+        if from_type == to_type:
+            return
+        match (from_type, to_type):
+            case (ValueType.TypeLong, ValueType.TypeQuad):
+                self.emit_ln("i64.extend_i32_s")
+            case (ValueType.TypeQuad, ValueType.TypeLong):
+                self.emit_ln("i32.wrap_i64")
+            case _:
+                self.abort(f"Cannot convert from {from_type} to {to_type}")
 
     def undefined(self, name: str):
         self.abort(f"Undefined identifier {name}")
 
     def ident(self):
         name = self.match(TokenKind.NAME)
-        entry = self.lookup_symbol(name)
-        match entry:
-            case GlobalVar():
-                self.emit_ln(f"global.get ${name}")
-            case _:
-                self.abort(f"Cannot refer to {name}")
+        self.lookup_symbol(name)
+        self.emit_ln(f"global.get ${name}")
 
     def toplevel(self):
         """Top-level entry point for the compiler.
@@ -392,15 +395,10 @@ class Compiler:
     # <relation> ::= <expression> [ <relop> <expression> ]
     def assign(self):
         name = self.match(TokenKind.NAME)
-        entry = self.lookup_symbol(name)
+        self.lookup_symbol(name)
         self.match(TokenKind.EQUAL)
         self.bool_expression()
-
-        match entry:
-            case GlobalVar():
-                self.emit_ln(f"global.set ${name}")
-            case _:
-                self.abort(f"Cannot assign to {name}")
+        self.emit_ln(f"global.set ${name}")
 
     def factor(self):
         if self.token.kind == TokenKind.LPAREN:
