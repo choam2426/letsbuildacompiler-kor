@@ -290,10 +290,11 @@ class Compiler:
     def undefined(self, name: str):
         self.abort(f"Undefined identifier {name}")
 
-    def ident(self):
+    def ident(self) -> ValueType:
         name = self.match(TokenKind.NAME)
-        self.lookup_symbol(name)
+        entry = self.lookup_symbol(name)
         self.emit_ln(f"global.get ${name}")
+        return entry.typ
 
     def toplevel(self):
         """Top-level entry point for the compiler.
@@ -330,6 +331,7 @@ class Compiler:
         self.emit_ln("")
         self.emit_ln('(func $main (export "main") (result i64)')
         self.indent += 2
+        self.emit_ln("(local $tmp i64)")
         self.block()
 
         # By convention our "ABI", the main function returns the value of the
@@ -395,165 +397,213 @@ class Compiler:
     # <relation> ::= <expression> [ <relop> <expression> ]
     def assign(self):
         name = self.match(TokenKind.NAME)
-        self.lookup_symbol(name)
+        entry = self.lookup_symbol(name)
         self.match(TokenKind.EQUAL)
-        self.bool_expression()
+        expr_type = self.bool_expression()
+
+        # TODO: here the result of the expression is on TOS. We should use
+        # convert_type() to convert it to the variable's type if needed.
+        # We should also have bool_expression return its type.
+        self.convert_type(expr_type, entry.typ)
         self.emit_ln(f"global.set ${name}")
 
-    def factor(self):
+    def factor(self) -> ValueType:
+        expr_type: ValueType
         if self.token.kind == TokenKind.LPAREN:
             self.advance_scanner()
-            self.bool_expression()
+            expr_type = self.bool_expression()
             self.match(TokenKind.RPAREN)
         elif self.token.kind == TokenKind.NAME:
-            self.ident()
+            expr_type = self.ident()
         else:
             num = self.match(TokenKind.NUMBER)
             self.emit_ln(f"i64.const {num}")
+            expr_type = ValueType.TypeQuad
+        print(f"returning from factor: expr_type={expr_type}")
+        return expr_type
 
-    def neg_factor(self):
+    def neg_factor(self) -> ValueType:
         self.match(TokenKind.SUB)
         if self.token.kind == TokenKind.NUMBER:
             self.emit_ln(f"i64.const -{self.match(TokenKind.NUMBER)}")
         else:
-            self.factor()
+            expr_type = self.factor()
+            self.convert_type(expr_type, ValueType.TypeQuad)
             self.emit_ln("i64.const -1")
             self.emit_ln("i64.mul")
+        return ValueType.TypeQuad
 
-    def first_factor(self):
+    def first_factor(self) -> ValueType:
         match self.token.kind:
             case TokenKind.ADD:
                 self.advance_scanner()
-                self.factor()
+                return self.factor()
             case TokenKind.SUB:
-                self.neg_factor()
+                return self.neg_factor()
             case _:
-                self.factor()
+                return self.factor()
 
-    def multiply(self):
+    def multiply(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.factor()
-        self.emit_ln("i64.mul")
+        rhs_type = self.factor()
+        return self.type_matched_binop(lhs_type, rhs_type, "mul")
 
-    def divide(self):
+    def divide(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.factor()
-        self.emit_ln("i64.div_s")
+        rhs_type = self.factor()
+        return self.type_matched_binop(lhs_type, rhs_type, "div_s")
 
-    def term1(self):
+    def term1(self, lhs_type: ValueType) -> ValueType:
         # Common code for term and first_term
         while self.token.kind in (TokenKind.MUL, TokenKind.DIV):
             if self.token.kind == TokenKind.MUL:
-                self.multiply()
+                lhs_type = self.multiply(lhs_type)
             elif self.token.kind == TokenKind.DIV:
-                self.divide()
+                lhs_type = self.divide(lhs_type)
+        return lhs_type
 
-    def term(self):
-        self.factor()
-        self.term1()
+    def term(self) -> ValueType:
+        lhs_type = self.factor()
+        return self.term1(lhs_type)
 
-    def first_term(self):
-        self.first_factor()
-        self.term1()
+    def first_term(self) -> ValueType:
+        first_type = self.first_factor()
+        print(f"first_term: first_type={first_type}")
+        return self.term1(first_type)
 
-    def add(self):
+    def add(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.term()
-        self.emit_ln("i64.add")
+        rhs_type = self.term()
+        return self.type_matched_binop(lhs_type, rhs_type, "add")
 
-    def subtract(self):
+    def subtract(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.term()
-        self.emit_ln("i64.sub")
+        rhs_type = self.term()
+        return self.type_matched_binop(lhs_type, rhs_type, "sub")
 
-    def expression(self):
-        self.first_term()
+    def expression(self) -> ValueType:
+        expr_type = self.first_term()
         while self.token.kind in (TokenKind.ADD, TokenKind.SUB):
             if self.token.kind == TokenKind.ADD:
-                self.add()
+                expr_type = self.add(expr_type)
             elif self.token.kind == TokenKind.SUB:
-                self.subtract()
+                expr_type = self.subtract(expr_type)
+        return expr_type
 
-    def equals(self):
+    def equals(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.expression()
-        self.emit_ln("i64.eq")
+        rhs_type = self.expression()
+        return self.type_matched_binop(lhs_type, rhs_type, "eq")
 
-    def not_equals(self):
+    def not_equals(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.expression()
-        self.emit_ln("i64.ne")
+        rhs_type = self.expression()
+        return self.type_matched_binop(lhs_type, rhs_type, "ne")
 
-    def less_than(self):
+    def less_than(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.expression()
-        self.emit_ln("i64.lt_s")
+        rhs_type = self.expression()
+        return self.type_matched_binop(lhs_type, rhs_type, "lt_s")
 
-    def less_equal(self):
+    def less_equal(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.expression()
-        self.emit_ln("i64.le_s")
+        rhs_type = self.expression()
+        return self.type_matched_binop(lhs_type, rhs_type, "le_s")
 
-    def greater_than(self):
+    def greater_than(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.expression()
-        self.emit_ln("i64.gt_s")
+        rhs_type = self.expression()
+        return self.type_matched_binop(lhs_type, rhs_type, "gt_s")
 
-    def greater_equal(self):
+    def greater_equal(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.expression()
-        self.emit_ln("i64.ge_s")
+        rhs_type = self.expression()
+        return self.type_matched_binop(lhs_type, rhs_type, "ge_s")
 
-    def relation(self):
-        self.expression()
+    def relation(self) -> ValueType:
+        lhs_type = self.expression()
         match self.token.kind:
             case TokenKind.EQUAL:
-                self.equals()
+                return self.equals(lhs_type)
             case TokenKind.NOT_EQUAL:
-                self.not_equals()
+                return self.not_equals(lhs_type)
             case TokenKind.LESS_THAN:
-                self.less_than()
+                return self.less_than(lhs_type)
             case TokenKind.LESS_EQUAL:
-                self.less_equal()
+                return self.less_equal(lhs_type)
             case TokenKind.GREATER_THAN:
-                self.greater_than()
+                return self.greater_than(lhs_type)
             case TokenKind.GREATER_EQUAL:
-                self.greater_equal()
+                return self.greater_equal(lhs_type)
             case _:
-                pass
+                return lhs_type
 
-    def not_factor(self):
+    def not_factor(self) -> ValueType:
         if self.token.kind == TokenKind.NOT:
             self.advance_scanner()
-            self.relation()
-            self.emit_ln("i64.eqz")
+            expr_type = self.relation()
+            if expr_type == ValueType.TypeLong:
+                self.emit_ln("i32.eqz")
+            else:
+                self.emit_ln("i64.eqz")
+            return expr_type
         else:
-            self.relation()
+            return self.relation()
 
-    def bool_term(self):
-        self.not_factor()
+    def bool_term(self) -> ValueType:
+        expr_type = self.not_factor()
         while self.token.kind == TokenKind.AND:
             self.advance_scanner()
-            self.not_factor()
-            self.emit_ln("i64.and")
+            rhs_type = self.not_factor()
+            expr_type = self.type_matched_binop(expr_type, rhs_type, "and")
+        return expr_type
 
-    def bool_or(self):
+    def bool_or(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.bool_term()
-        self.emit_ln("i64.or")
+        rhs_type = self.bool_term()
+        return self.type_matched_binop(lhs_type, rhs_type, "or")
 
-    def bool_xor(self):
+    def bool_xor(self, lhs_type: ValueType) -> ValueType:
         self.advance_scanner()
-        self.bool_term()
-        self.emit_ln("i64.xor")
+        rhs_type = self.bool_term()
+        return self.type_matched_binop(lhs_type, rhs_type, "xor")
 
-    def bool_expression(self):
-        self.bool_term()
+    def bool_expression(self) -> ValueType:
+        # expr_type starts with the type of the left-most bool-term, and is
+        # updated after each operation. The type can only expand from long to
+        # quad as needed.
+        expr_type = self.bool_term()
         while self.token.kind in (TokenKind.OR, TokenKind.XOR):
             if self.token.kind == TokenKind.OR:
-                self.bool_or()
+                expr_type = self.bool_or(expr_type)
             elif self.token.kind == TokenKind.XOR:
-                self.bool_xor()
+                expr_type = self.bool_xor(expr_type)
+        return expr_type
+
+    def type_matched_binop(
+        self, type1: ValueType, type2: ValueType, op: str
+    ) -> ValueType | NoReturn:
+        match (type1, type2):
+            case (ValueType.TypeLong, ValueType.TypeLong):
+                self.emit_ln(f"i32.{op}")
+                return ValueType.TypeLong
+            case (ValueType.TypeQuad, ValueType.TypeQuad):
+                self.emit_ln(f"i64.{op}")
+                return ValueType.TypeQuad
+            case (ValueType.TypeQuad, ValueType.TypeLong):
+                self.emit_ln("i32.extend_i32_s")
+                self.emit_ln(f"i64.{op}")
+                return ValueType.TypeQuad
+            case (ValueType.TypeLong, ValueType.TypeQuad):
+                # Use local to hold the i64 value while we convert the i32 below
+                # it to i64 as well.
+                self.emit_ln("local.set $tmp")
+                self.emit_ln("i64.extend_i32_s")
+                self.emit_ln("local.get $tmp")
+                self.emit_ln(f"i64.{op}")
+                return ValueType.TypeQuad
+            case _:
+                self.abort(f"Cannot apply {op} to {type1} and {type2}")
 
     def do_if(self, breakloop_label: str = ""):
         self.advance_scanner()
