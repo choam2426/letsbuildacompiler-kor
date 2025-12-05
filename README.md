@@ -30,10 +30,22 @@ emitted WASM and verify the results - so this is a full compiler from the input
 language (a variation of KISS or TINY depending on the part in the original
 tutorial) to execution.
 
+## Developing
+
+`uv` is used to set up a projects and invoke tools like `ty` and `ruff`.
+
+See the accompanying `Makefile` for the commands needed. To run a single
+test file, use something like:
+
+```
+uv run python -m unittest discover -s tests -p "test_14*"
+```
+
 ## Debugging helper
 
-`tryloader.html` - helper HTML container for debugging generated WASM. For a
-given WAT file with a `main` function, first translated it to binary WASM:
+`tryloader.html` - helper HTML container for debugging generated WASM (using the
+debugger built into Chrome dev tools). For a given WAT file with a `main`
+function, first translate it to binary WASM:
 
 ```
 $ wasm-tools parse try.wat -o try.wasm
