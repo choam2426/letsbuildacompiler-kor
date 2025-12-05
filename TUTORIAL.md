@@ -515,20 +515,40 @@ advanced, layered compiler architecture.
 
 ## Part 14: Types
 
-TODO: ...
+In this part, the original tutorial goes back to a very simple parser with
+barely any codegen, single-char tokens, no procedures, no control flow, etc.
 
-To simplify type handling, use LONG and QUAD types. Also i64 is the default
-type for this part
+As usual, we won't go *that* minimalistic, but I did remove procedures and
+calls to keep the complexity manageable.
 
-Once again, the original tutorial states:
+Here's a program our compiler for this part supports:
 
-  As I did in the last segment, I will NOT incorporate
-  these  features directly into the TINY  compiler  at  this  time.
-  Instead, I'll be using the same approach that has worked  so well
-  for  us  in the past: using only  fragments  of  the  parser  and
-  single-character  tokens.
+```
+var long A=5, B=15;
+var quad C=20;
+var quad X=0;
 
-However, we *will* be incorporating the feature into our compiler, as before,
-and will emerge with a type-capable version of the language from part 13
-(including procedure definitions and calls).
+program testprog
+begin
+    X = A + B + C;
+end
+.
+```
 
+Note the typed variable declarations. Since it's 2025, we'll support 32-bit and
+64-bit types (instead of 8, 16, 32 as in the original tutorial); it also works
+much better with our WASM target (which itself only supports 32-bit and 64-bit
+integers as base types).
+
+In the previous part I wrote how the syntax directed translation approach of the
+compiler starts bursting at the seams as complexity grows. For handling types,
+it's even more apparent. First, every compiler method now has to return the
+type of the expression it parsed and emitted. Second, since the parsing and
+emission happens together, sometimes it's not enough. If we emit the two sides
+of a binary operation and discover that their types don't match and a conversion
+is required, we have to engage in an awkward stack dance to convert the emitted
+values to the proper type (see the `type_matched_binop` method of our compiler).
+
+A proper compiler would have a separate type checking phase, where types would
+be attached to all AST nodes; then, when the code generator runs, it can emit
+the right code off that bat without having to fix it up later.
