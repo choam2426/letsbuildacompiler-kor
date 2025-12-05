@@ -289,7 +289,7 @@ No code in this part of the original tutorial.
 
 ## Part 9: A Top View
 
-This part demonstartes how to approach building a compiler for an entire
+This part demonstrates how to approach building a compiler for an entire
 language using the same approach taken in previous parts. It's back to
 single-character tokens, and mostly creates scaffolding functions that call each
 other in the proper nesting structure.
@@ -502,7 +502,7 @@ and AST, and then a distinct step would take the AST and emit code from it.
 
 As things stand now, it's difficult to emit tight code because we don't know
 what's ahead - and we can't just peek without emitting code or doing some sort
-of backpatching. For example, when we emit arguments for calls, we have to make
+of back-patching. For example, when we emit arguments for calls, we have to make
 space for each ref argument on the stack separately. It's difficult to count
 arguments ahead of time and emit a single stack size increase because parsing
 arguments also emits the code for them.
@@ -552,3 +552,14 @@ values to the proper type (see the `type_matched_binop` method of our compiler).
 A proper compiler would have a separate type checking phase, where types would
 be attached to all AST nodes; then, when the code generator runs, it can emit
 the right code off that bat without having to fix it up later.
+
+## Part 15: Back to the Future
+
+No new code in this part of the original tutorial; the author restructured some
+of his existing code into separate Pascal units.
+
+## Part 16: Unit Construction
+
+No new code here either; the author kept restructuring and rewriting the same
+parser code that existed before into a slightly cleaner structure in separate
+units.
