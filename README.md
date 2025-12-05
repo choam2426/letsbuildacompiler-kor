@@ -4,7 +4,10 @@ This repository closely follows the venerable ["Let's Build a Compiler" tutorial
 by Jack Crenshaw](https://compilers.iecc.com/crenshaw/).
 
 Each _part_ of the original tutorial is mapped to a `partNN_xxx.py` file in this
-repository, implementing a compiler for the same language. Each Python file
+repository, implementing a compiler for the same language. Please follow
+[TUTORIAL.md](./TUTORIAL.md) for the details.
+
+Each Python file
 is self-contained and dependency free. The only dependency used in this repository
 is the [wasmtime bindings](https://pypi.org/project/wasmtime/) for testing.
 
