@@ -323,8 +323,7 @@ class TestCompileAndExecute(unittest.TestCase):
                 addseq(11, X)
             end
             .
-            """,
-            show=True,
+            """
         )
         self.assertEqual(result, 55)
 
