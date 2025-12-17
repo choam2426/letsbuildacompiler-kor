@@ -1,5 +1,7 @@
 # letsbuildacompiler
 
+English | [한국어](./README.ko.md)
+
 This repository closely follows the venerable ["Let's Build a Compiler" tutorial
 by Jack Crenshaw](https://compilers.iecc.com/crenshaw/).
 

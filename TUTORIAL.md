@@ -3,6 +3,8 @@ This document describes how the orignal
 translated to our Python-based compiler that emits WASM text. The best way to
 follow along is, starting with Part 1:
 
+English | [한국어](./TUTORIAL.ko.md)
+
 1. Read Part N in the original tutorial.
 2. Read the Part N section in this document.
 3. Review the code in `partN_<name>.py` and the corresponding tests in the
